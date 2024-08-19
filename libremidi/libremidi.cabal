@@ -7,9 +7,9 @@ cabal-version: 1.12
 name:           libremidi
 version:        0.1.0
 synopsis:       libremidi bindings for haskell
-description:    Please see the README on GitHub at <https://github.com/ejconlon/libremidi#readme>
-homepage:       https://github.com/ejconlon/libremidi#readme
-bug-reports:    https://github.com/ejconlon/libremidi/issues
+description:    Please see the README on GitHub at <https://github.com/ejconlon/libremidi-haskell#readme>
+homepage:       https://github.com/ejconlon/libremidi-haskell#readme
+bug-reports:    https://github.com/ejconlon/libremidi-haskell/issues
 author:         Eric Conlon
 maintainer:     ejconlon@gmail.com
 copyright:      (c) 2024 Eric Conlon
@@ -20,7 +20,7 @@ tested-with:
 
 source-repository head
   type: git
-  location: https://github.com/ejconlon/libremidi
+  location: https://github.com/ejconlon/libremidi-haskell
 
 library
   exposed-modules:

@@ -1,13 +1,13 @@
 name: libremidi
 version: 0.1.0
 
-github: ejconlon/libremidi
+github: ejconlon/libremidi-haskell
 license: BSD3
 author: Eric Conlon
 maintainer: ejconlon@gmail.com
 copyright: (c) 2024 Eric Conlon
 synopsis: libremidi bindings for haskell
-description: Please see the README on GitHub at <https://github.com/ejconlon/libremidi#readme>
+description: Please see the README on GitHub at <https://github.com/ejconlon/libremidi-haskell#readme>
 tested-with: GHC == 9.6.6
 
 defaults:
