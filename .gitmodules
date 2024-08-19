@@ -1,0 +1,3 @@
+[submodule "submodules/libremidi"]
+	path = submodules/libremidi
+	url = https://github.com/celtera/libremidi.git
