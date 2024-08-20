@@ -25,7 +25,6 @@ source-repository head
 library
   exposed-modules:
       Libremidi.Foreign
-      Libremidi.Main
   other-modules:
       Paths_libremidi
   autogen-modules:

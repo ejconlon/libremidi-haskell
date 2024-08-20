@@ -3,4 +3,5 @@ module Main
   )
 where
 
-import Libremidi.Main (main)
+main :: IO ()
+main = pure ()
