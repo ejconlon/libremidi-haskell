@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
 
 module Libremidi.Foreign where

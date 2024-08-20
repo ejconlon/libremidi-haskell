@@ -24,6 +24,7 @@ source-repository head
 
 library
   exposed-modules:
+      Libremidi
       Libremidi.Foreign
   other-modules:
       Paths_libremidi
