@@ -23,10 +23,8 @@ library:
   - stdc++
   include-dirs:
   - vendor
-  - cbits
   cxx-sources:
   - vendor/**/*.cpp
-  - cbits/*.cpp
   cxx-options: -std=c++20 -DLIBREMIDI_HEADER_ONLY=1 -DLIBREMIDI_COREMIDI=1
   frameworks: CoreMIDI CoreAudio CoreFoundation
   #   -- NOTE(ejconlon) This is to make the c ffi wrapper actually catch
