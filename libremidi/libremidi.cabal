@@ -25,6 +25,7 @@ source-repository head
 library
   exposed-modules:
       Libremidi
+      Libremidi.Common
       Libremidi.Foreign
   other-modules:
       Paths_libremidi
@@ -62,9 +63,10 @@ library
       TypeOperators
       TypeFamilies
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -pgmc=clang++
-  cxx-options: -std=c++20 -D__MACOSX_CORE__
+  cxx-options: -std=c++20 -DLIBREMIDI_HEADER_ONLY=1 -DLIBREMIDI_COREMIDI=1
   include-dirs:
       vendor
+      cbits
   cxx-sources:
       vendor/libremidi/backends/emscripten/midi_access.cpp
       vendor/libremidi/backends/emscripten/midi_in.cpp
@@ -78,6 +80,7 @@ library
       vendor/libremidi/observer.cpp
       vendor/libremidi/reader.cpp
       vendor/libremidi/writer.cpp
+      cbits/cbits.cpp
   extra-libraries:
       stdc++
   frameworks:
@@ -85,6 +88,7 @@ library
   ld-options: -Wl,-keep_dwarf_unwind
   build-depends:
       base >=4.12 && <5
+    , text >=2.0.2 && <2.1
   default-language: GHC2021
 
 executable libremidi-exe
@@ -128,6 +132,7 @@ executable libremidi-exe
   build-depends:
       base >=4.12 && <5
     , libremidi
+    , text >=2.0.2 && <2.1
   default-language: GHC2021
 
 test-suite libremidi-test
@@ -174,4 +179,5 @@ test-suite libremidi-test
     , libremidi
     , tasty
     , tasty-hunit
+    , text >=2.0.2 && <2.1
   default-language: GHC2021

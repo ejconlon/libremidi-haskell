@@ -15,17 +15,19 @@ defaults:
 
 dependencies:
 - base >= 4.12 && < 5
+- text >= 2.0.2 && < 2.1
 
 library:
   source-dirs: src
   extra-libraries:
-  # - libremidi
   - stdc++
   include-dirs:
   - vendor
+  - cbits
   cxx-sources:
   - vendor/**/*.cpp
-  cxx-options: -std=c++20 -D__MACOSX_CORE__
+  - cbits/*.cpp
+  cxx-options: -std=c++20 -DLIBREMIDI_HEADER_ONLY=1 -DLIBREMIDI_COREMIDI=1
   frameworks: CoreMIDI CoreAudio CoreFoundation
   #   -- NOTE(ejconlon) This is to make the c ffi wrapper actually catch
   #   -- the c++ exceptions instead of simply aborting.
