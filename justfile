@@ -48,3 +48,9 @@ lint-apply:
 # Run the executable
 exe:
   {{ stack_build }} --test --no-run-tests --exec libremidi-exe
+
+# Copy libremidi sources into build tree
+vendor:
+  rm -rf libremidi/vendor
+  cp -r submodules/libremidi/include libremidi/vendor
+

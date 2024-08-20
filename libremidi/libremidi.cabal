@@ -1,4 +1,4 @@
-cabal-version: 1.12
+cabal-version: 2.2
 
 -- This file has been generated from package.yaml by hpack version 0.36.0.
 --
@@ -13,7 +13,7 @@ bug-reports:    https://github.com/ejconlon/libremidi-haskell/issues
 author:         Eric Conlon
 maintainer:     ejconlon@gmail.com
 copyright:      (c) 2024 Eric Conlon
-license:        BSD3
+license:        BSD-3-Clause
 build-type:     Simple
 tested-with:
     GHC == 9.6.6
@@ -24,8 +24,11 @@ source-repository head
 
 library
   exposed-modules:
+      Libremidi.Foreign
       Libremidi.Main
   other-modules:
+      Paths_libremidi
+  autogen-modules:
       Paths_libremidi
   hs-source-dirs:
       src
@@ -58,7 +61,28 @@ library
       TypeApplications
       TypeOperators
       TypeFamilies
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -pgmc=clang++
+  cxx-options: -std=c++20 -D__MACOSX_CORE__
+  include-dirs:
+      vendor
+  cxx-sources:
+      vendor/libremidi/backends/emscripten/midi_access.cpp
+      vendor/libremidi/backends/emscripten/midi_in.cpp
+      vendor/libremidi/backends/emscripten/midi_out.cpp
+      vendor/libremidi/backends/emscripten/observer.cpp
+      vendor/libremidi/client.cpp
+      vendor/libremidi/libremidi-c.cpp
+      vendor/libremidi/libremidi.cpp
+      vendor/libremidi/midi_in.cpp
+      vendor/libremidi/midi_out.cpp
+      vendor/libremidi/observer.cpp
+      vendor/libremidi/reader.cpp
+      vendor/libremidi/writer.cpp
+  extra-libraries:
+      stdc++
+  frameworks:
+      CoreMIDI CoreAudio CoreFoundation
+  ld-options: -Wl,-keep_dwarf_unwind
   build-depends:
       base >=4.12 && <5
   default-language: GHC2021
@@ -66,6 +90,8 @@ library
 executable libremidi-exe
   main-is: Main.hs
   other-modules:
+      Paths_libremidi
+  autogen-modules:
       Paths_libremidi
   hs-source-dirs:
       exe
@@ -108,6 +134,8 @@ test-suite libremidi-test
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      Paths_libremidi
+  autogen-modules:
       Paths_libremidi
   hs-source-dirs:
       test
