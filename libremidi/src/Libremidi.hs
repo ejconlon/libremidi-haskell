@@ -1,14 +1,8 @@
 module Libremidi where
 
-import Control.Exception (Exception)
-import Control.Monad (when)
-import Control.Monad.Except (ExceptT, MonadError (..), runExceptT)
-import Control.Monad.Free (Free)
-import Control.Monad.IO.Class (MonadIO (..))
+import Data.Coerce (coerce)
 import Data.Text (Text)
-import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtrBytes, withForeignPtr)
-import Foreign.Ptr (castPtr)
-import Libremidi.Common (BitEnum)
+import Libremidi.Common (BitEnum (..), M, assocM, takeM, textM)
 import Libremidi.Foreign qualified as F
 
 data TimestampMode
@@ -56,64 +50,34 @@ data Version
 
 instance BitEnum F.CVersion Version
 
-newtype Err = Err F.CErr
-  deriving stock (Eq, Ord, Show)
-
-instance Exception Err
-
-data F a where
-  FErr :: Err -> F a
-  FCont :: (forall r. (a -> IO r) -> IO r) -> F a
-
-instance Functor F where
-  fmap f = \case
-    FErr e -> FErr e
-    FCont k -> FCont (\g -> k (g . f))
-
-newtype M a = M {unM :: Free F a}
-  deriving (Functor, Applicative, Monad)
-
-instance MonadIO M where
-  liftIO = undefined
-
-instance MonadError Err M where
-  throwError = undefined
-
-runM :: M a -> IO (Either Err a)
-runM m = undefined
-
-useM :: (forall r. (a -> IO r) -> IO r) -> M a
-useM x = undefined
-
-guardM :: IO F.CErr -> M ()
-guardM eact = do
-  e <- liftIO eact
-  when (e /= 0) (throwError (Err e))
-
 ipClone :: F.InPort -> M F.InPort
 ipClone ip = do
-  fp <- liftIO (mallocForeignPtrBytes 0)
-  ptr <- useM (withForeignPtr fp)
-  cip <- useM (F.ipWithPtr ip)
-  guardM (F.libremidi_midi_in_port_clone cip (castPtr ptr))
+  ptr <- assocM ip
+  fp <- takeM (F.libremidi_midi_in_port_clone ptr . coerce)
   pure (F.InPort fp)
 
 ipName :: F.InPort -> M Text
-ipName = error "TODO"
+ipName ip = do
+  ptr <- assocM ip
+  textM (F.libremidi_midi_in_port_name (coerce ptr))
 
 opClone :: F.OutPort -> M F.OutPort
 opClone op = do
-  fp <- liftIO (mallocForeignPtrBytes 0)
-  ptr <- useM (withForeignPtr fp)
-  cop <- useM (F.opWithPtr op)
-  guardM (F.libremidi_midi_out_port_clone cop (castPtr ptr))
+  ptr <- assocM op
+  fp <- takeM (F.libremidi_midi_out_port_clone ptr . coerce)
   pure (F.OutPort fp)
 
 opName :: F.OutPort -> M Text
-opName = error "TODO"
+opName op = do
+  ptr <- assocM op
+  textM (F.libremidi_midi_out_port_name (coerce ptr))
 
 obsNew :: F.ObsConfig -> F.ApiConfig -> M F.ObsHandle
-obsNew oc ac = error "TODO"
+obsNew oc ac = do
+  ocptr <- assocM oc
+  acptr <- assocM ac
+  fp <- takeM (F.libremidi_midi_observer_new ocptr acptr . coerce)
+  pure (F.ObsHandle fp)
 
 -- TODO expose these
 -- libremidi_midi_in_port_clone :: CInPort -> Ptr CInPort -> IO CErr

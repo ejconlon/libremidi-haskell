@@ -5,37 +5,12 @@ module Libremidi.Foreign where
 import Foreign.C (CInt (..), CSize (..), CBool (..), CUInt (..), CLong (..), CUChar (..))
 import Foreign.C.String (CString)
 import Data.Void (Void)
-import Foreign.Ptr (Ptr, plusPtr, FunPtr, freeHaskellFunPtr, castFunPtrToPtr, castPtrToFunPtr)
-import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtrBytes, withForeignPtr)
-import Foreign.Concurrent qualified as FC
+import Foreign.Ptr (Ptr, plusPtr, FunPtr)
+import Foreign.ForeignPtr (ForeignPtr, withForeignPtr)
 import Data.Coerce (coerce)
-import Foreign.Marshal.Utils (fillBytes)
+import Libremidi.Common (CErr, AssocPtr (..), Field, Cb, mallocForeignPtrBytes0, cbMalloc, cbWithPtr, ptrSize)
 
 #include "libremidi/libremidi-c.h"
-
-type Field a b = a -> Ptr b
-
-ptrSize :: Int
-ptrSize = #{size midi1_message}
-
-newtype Cb x = Cb { unCb :: ForeignPtr x }
-
-cbWithPtr :: Cb x -> (FunPtr x -> IO a) -> IO a
-cbWithPtr (Cb fp) f = withForeignPtr fp (f . castPtrToFunPtr)
-
-cbMalloc :: (x -> IO (FunPtr x)) -> x -> IO (Cb x)
-cbMalloc g x = do
-  y <- g x
-  fp <- FC.newForeignPtr (castFunPtrToPtr y) (freeHaskellFunPtr y)
-  pure (Cb fp)
-
-mallocForeignPtrBytes0 :: Int -> IO (ForeignPtr a)
-mallocForeignPtrBytes0 len = do
-  fp <- mallocForeignPtrBytes len
-  withForeignPtr fp (\p -> fillBytes p 0 len)
-  pure fp
-
-type CErr = CInt
 
 type CSym1 = CUChar
 type CMsg1 = Ptr CSym1
@@ -51,8 +26,8 @@ newtype CInPort = CInPort { unCInPort :: Ptr Void }
 newtype InPort = InPort { unInPort :: ForeignPtr Void }
   deriving stock (Eq, Show)
 
-ipWithPtr :: InPort -> (CInPort -> IO a) -> IO a
-ipWithPtr (InPort fp) f = withForeignPtr fp (f . coerce)
+instance AssocPtr InPort CInPort where
+  withAssocPtr (InPort fp) f = withForeignPtr fp (f . coerce)
 
 newtype COutPort = COutPort { unCOutPort :: Ptr Void }
   deriving stock (Eq, Show)
@@ -60,8 +35,8 @@ newtype COutPort = COutPort { unCOutPort :: Ptr Void }
 newtype OutPort = OutPort { unOutPort :: ForeignPtr Void }
   deriving stock (Eq, Show)
 
-opWithPtr :: OutPort -> (COutPort -> IO a) -> IO a
-opWithPtr (OutPort fp) f = withForeignPtr fp (f . coerce)
+instance AssocPtr OutPort COutPort where
+  withAssocPtr (OutPort fp) f = withForeignPtr fp (f . coerce)
 
 newtype CInHandle = CInHandle { unCInHandle :: Ptr Void }
   deriving stock (Eq, Show)
@@ -69,8 +44,8 @@ newtype CInHandle = CInHandle { unCInHandle :: Ptr Void }
 newtype InHandle = InHandle { unInHandle :: ForeignPtr Void }
   deriving stock (Eq, Show)
 
-ihWithPtr :: InHandle -> (CInHandle -> IO a) -> IO a
-ihWithPtr (InHandle fp) f = withForeignPtr fp (f . coerce)
+instance AssocPtr InHandle CInHandle where
+  withAssocPtr (InHandle fp) f = withForeignPtr fp (f . coerce)
 
 newtype COutHandle = COutHandle { unCOutHandle :: Ptr Void }
   deriving stock (Eq, Show)
@@ -78,8 +53,8 @@ newtype COutHandle = COutHandle { unCOutHandle :: Ptr Void }
 newtype OutHandle = OutHandle { unOutHandle :: ForeignPtr Void }
   deriving stock (Eq, Show)
 
-ohWithPtr :: OutHandle -> (COutHandle -> IO a) -> IO a
-ohWithPtr (OutHandle fp) f = withForeignPtr fp (f . coerce)
+instance AssocPtr OutHandle COutHandle where
+  withAssocPtr (OutHandle fp) f = withForeignPtr fp (f . coerce)
 
 newtype CObsHandle = CObsHandle { unCObsHandle :: Ptr Void }
   deriving stock (Eq, Show)
@@ -87,8 +62,8 @@ newtype CObsHandle = CObsHandle { unCObsHandle :: Ptr Void }
 newtype ObsHandle = ObsHandle { unObsHandle :: ForeignPtr Void }
   deriving stock (Eq, Show)
 
-bhWithPtr :: ObsHandle -> (CObsHandle -> IO a) -> IO a
-bhWithPtr (ObsHandle fp) f = withForeignPtr fp (f . coerce)
+instance AssocPtr ObsHandle CObsHandle where
+  withAssocPtr (ObsHandle fp) f = withForeignPtr fp (f . coerce)
 
 type CTimestampMode = CInt
 
@@ -154,8 +129,8 @@ cacData (CApiConfig base) = plusPtr base #{offset libremidi_api_configuration, d
 newtype ApiConfig = ApiConfig { unApiConfig :: ForeignPtr Void }
   deriving stock (Eq, Show)
 
-acWithPtr :: ApiConfig -> (CApiConfig -> IO a) -> IO a
-acWithPtr (ApiConfig fp) f = withForeignPtr fp (f . coerce)
+instance AssocPtr ApiConfig CApiConfig where
+  withAssocPtr (ApiConfig fp) f = withForeignPtr fp (f . coerce)
 
 acMalloc :: IO ApiConfig
 acMalloc = coerce (mallocForeignPtrBytes0 #{size libremidi_api_configuration})
@@ -170,8 +145,8 @@ foreign import ccall "wrapper"
 
 newtype LogCb = LogCb { unLogCb :: Cb CLogCbFun }
 
-lcbWithPtr :: LogCb -> (CLogCb -> IO a) -> IO a
-lcbWithPtr (LogCb c) f = cbWithPtr c (f . coerce)
+instance AssocPtr LogCb CLogCb where
+  withAssocPtr (LogCb c) f = cbWithPtr c (f . coerce)
 
 lcbMalloc :: CLogCbFun -> IO LogCb
 lcbMalloc = coerce . cbMalloc (coerce clcbWrap)
@@ -186,8 +161,8 @@ foreign import ccall "wrapper"
 
 newtype InCb = InCb { unInCb :: Cb CInCbFun }
 
-icbWithPtr :: InCb -> (CInCb -> IO a) -> IO a
-icbWithPtr (InCb c) f = cbWithPtr c (f . coerce)
+instance AssocPtr InCb CInCb where
+  withAssocPtr (InCb c) f = cbWithPtr c (f . coerce)
 
 icbMalloc :: CInCbFun -> IO InCb
 icbMalloc = coerce . cbMalloc (coerce cicbWrap)
@@ -202,8 +177,8 @@ foreign import ccall "wrapper"
 
 newtype OutCb = OutCb { unOutCb :: Cb COutCbFun }
 
-ocbWithPtr :: OutCb -> (COutCb -> IO a) -> IO a
-ocbWithPtr (OutCb c) f = cbWithPtr c (f . coerce)
+instance AssocPtr OutCb COutCb where
+  withAssocPtr (OutCb c) f = cbWithPtr c (f . coerce)
 
 ocbMalloc :: COutCbFun -> IO OutCb
 ocbMalloc = coerce . cbMalloc (coerce cocbWrap)
@@ -244,8 +219,8 @@ cocNotifInCon (CObsConfig base) = plusPtr base #{offset libremidi_observer_confi
 newtype ObsConfig = ObsConfig { unObsConfig :: ForeignPtr Void }
   deriving stock (Eq, Show)
 
-ocWithPtr :: ObsConfig -> (CObsConfig -> IO a) -> IO a
-ocWithPtr (ObsConfig fp) f = withForeignPtr fp (f . coerce)
+instance AssocPtr ObsConfig CObsConfig where
+  withAssocPtr (ObsConfig fp) f = withForeignPtr fp (f . coerce)
 
 ocMalloc :: IO ObsConfig
 ocMalloc = coerce (mallocForeignPtrBytes0 #{size libremidi_observer_configuration})
@@ -260,8 +235,8 @@ foreign import ccall "wrapper"
 
 newtype Msg1Cb = Msg1Cb { unMsg1Cb :: Cb CMsg1CbFun }
 
-m1cbWithPtr :: Msg1Cb -> (CMsg1Cb -> IO a) -> IO a
-m1cbWithPtr (Msg1Cb c) f = cbWithPtr c (f . coerce)
+instance AssocPtr Msg1Cb CMsg1Cb where
+  withAssocPtr (Msg1Cb c) f = cbWithPtr c (f . coerce)
 
 m1cbMalloc :: CMsg1CbFun -> IO Msg1Cb
 m1cbMalloc = coerce . cbMalloc (coerce cm1cbWrap)
@@ -276,8 +251,8 @@ foreign import ccall "wrapper"
 
 newtype Msg2Cb = Msg2Cb { unMsg2Cb :: Cb CMsg2CbFun }
 
-m2cbWithPtr :: Msg2Cb -> (CMsg2Cb -> IO a) -> IO a
-m2cbWithPtr (Msg2Cb c) f = cbWithPtr c (f . coerce)
+instance AssocPtr Msg2Cb CMsg2Cb where
+  withAssocPtr (Msg2Cb c) f = cbWithPtr c (f . coerce)
 
 m2cbMalloc :: CMsg2CbFun -> IO Msg2Cb
 m2cbMalloc = coerce . cbMalloc (coerce cm2cbWrap)
@@ -292,8 +267,8 @@ foreign import ccall "wrapper"
 
 newtype TimeCb = TimeCb { unTimeCb :: Cb CTimeCbFun }
 
-tcbWithPtr :: TimeCb -> (CTimeCb -> IO a) -> IO a
-tcbWithPtr (TimeCb c) f = cbWithPtr c (f . coerce)
+instance AssocPtr TimeCb CTimeCb where
+  withAssocPtr (TimeCb c) f = cbWithPtr c (f . coerce)
 
 tcbMalloc :: CTimeCbFun -> IO TimeCb
 tcbMalloc = coerce . cbMalloc (coerce ctcbWrap)
@@ -346,8 +321,8 @@ cmcTimestamps (CMidiConfig base) = plusPtr base #{offset libremidi_midi_configur
 newtype MidiConfig = MidiConfig { unMidiConfig :: ForeignPtr Void }
   deriving stock (Eq, Show)
 
-mcWithPtr :: MidiConfig -> (CMidiConfig -> IO a) -> IO a
-mcWithPtr (MidiConfig fp) f = withForeignPtr fp (f . coerce)
+instance AssocPtr MidiConfig CMidiConfig where
+  withAssocPtr (MidiConfig fp) f = withForeignPtr fp (f . coerce)
 
 mcMalloc :: IO MidiConfig
 mcMalloc = coerce (mallocForeignPtrBytes0 #{size libremidi_midi_configuration})
