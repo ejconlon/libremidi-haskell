@@ -5,30 +5,29 @@ module Libremidi.Foreign where
 import Foreign.C (CInt (..), CSize (..), CBool (..), CUInt (..), CLong (..), CUChar (..))
 import Foreign.C.String (CString)
 import Data.Void (Void)
-import Foreign.Ptr (Ptr, plusPtr, FunPtr, freeHaskellFunPtr)
+import Foreign.Ptr (Ptr, plusPtr, FunPtr, freeHaskellFunPtr, castFunPtrToPtr, castPtrToFunPtr)
 import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtrBytes, withForeignPtr)
+import Foreign.Concurrent qualified as FC
 import Data.Coerce (coerce)
-import System.Mem.Weak (Weak, mkWeak)
 import Foreign.Marshal.Utils (fillBytes)
 
 #include "libremidi/libremidi-c.h"
-#include "cbits.h"
 
 type Field a b = a -> Ptr b
 
 ptrSize :: Int
 ptrSize = #{size midi1_message}
 
-data Cb x = Cb { cbPtr :: FunPtr x, cbWeak :: Weak () }
+newtype Cb x = Cb { unCb :: ForeignPtr x }
 
 cbWithPtr :: Cb x -> (FunPtr x -> IO a) -> IO a
-cbWithPtr (Cb y _) f = f y
+cbWithPtr (Cb fp) f = withForeignPtr fp (f . castPtrToFunPtr)
 
 cbMalloc :: (x -> IO (FunPtr x)) -> x -> IO (Cb x)
 cbMalloc g x = do
   y <- g x
-  w <- mkWeak y () (Just (freeHaskellFunPtr y))
-  pure (Cb y w)
+  fp <- FC.newForeignPtr (castFunPtrToPtr y) (freeHaskellFunPtr y)
+  pure (Cb fp)
 
 mallocForeignPtrBytes0 :: Int -> IO (ForeignPtr a)
 mallocForeignPtrBytes0 len = do
@@ -49,17 +48,47 @@ type CTimestamp = CLong
 newtype CInPort = CInPort { unCInPort :: Ptr Void }
   deriving stock (Eq, Show)
 
+newtype InPort = InPort { unInPort :: ForeignPtr Void }
+  deriving stock (Eq, Show)
+
+ipWithPtr :: InPort -> (CInPort -> IO a) -> IO a
+ipWithPtr (InPort fp) f = withForeignPtr fp (f . coerce)
+
 newtype COutPort = COutPort { unCOutPort :: Ptr Void }
   deriving stock (Eq, Show)
+
+newtype OutPort = OutPort { unOutPort :: ForeignPtr Void }
+  deriving stock (Eq, Show)
+
+opWithPtr :: OutPort -> (COutPort -> IO a) -> IO a
+opWithPtr (OutPort fp) f = withForeignPtr fp (f . coerce)
 
 newtype CInHandle = CInHandle { unCInHandle :: Ptr Void }
   deriving stock (Eq, Show)
 
+newtype InHandle = InHandle { unInHandle :: ForeignPtr Void }
+  deriving stock (Eq, Show)
+
+ihWithPtr :: InHandle -> (CInHandle -> IO a) -> IO a
+ihWithPtr (InHandle fp) f = withForeignPtr fp (f . coerce)
+
 newtype COutHandle = COutHandle { unCOutHandle :: Ptr Void }
   deriving stock (Eq, Show)
 
+newtype OutHandle = OutHandle { unOutHandle :: ForeignPtr Void }
+  deriving stock (Eq, Show)
+
+ohWithPtr :: OutHandle -> (COutHandle -> IO a) -> IO a
+ohWithPtr (OutHandle fp) f = withForeignPtr fp (f . coerce)
+
 newtype CObsHandle = CObsHandle { unCObsHandle :: Ptr Void }
   deriving stock (Eq, Show)
+
+newtype ObsHandle = ObsHandle { unObsHandle :: ForeignPtr Void }
+  deriving stock (Eq, Show)
+
+bhWithPtr :: ObsHandle -> (CObsHandle -> IO a) -> IO a
+bhWithPtr (ObsHandle fp) f = withForeignPtr fp (f . coerce)
 
 type CTimestampMode = CInt
 
@@ -126,7 +155,7 @@ newtype ApiConfig = ApiConfig { unApiConfig :: ForeignPtr Void }
   deriving stock (Eq, Show)
 
 acWithPtr :: ApiConfig -> (CApiConfig -> IO a) -> IO a
-acWithPtr (ApiConfig fp) f = withForeignPtr fp (\p -> f (coerce p))
+acWithPtr (ApiConfig fp) f = withForeignPtr fp (f . coerce)
 
 acMalloc :: IO ApiConfig
 acMalloc = coerce (mallocForeignPtrBytes0 #{size libremidi_api_configuration})
@@ -216,7 +245,7 @@ newtype ObsConfig = ObsConfig { unObsConfig :: ForeignPtr Void }
   deriving stock (Eq, Show)
 
 ocWithPtr :: ObsConfig -> (CObsConfig -> IO a) -> IO a
-ocWithPtr (ObsConfig fp) f = withForeignPtr fp (\p -> f (coerce p))
+ocWithPtr (ObsConfig fp) f = withForeignPtr fp (f . coerce)
 
 ocMalloc :: IO ObsConfig
 ocMalloc = coerce (mallocForeignPtrBytes0 #{size libremidi_observer_configuration})
@@ -318,7 +347,7 @@ newtype MidiConfig = MidiConfig { unMidiConfig :: ForeignPtr Void }
   deriving stock (Eq, Show)
 
 mcWithPtr :: MidiConfig -> (CMidiConfig -> IO a) -> IO a
-mcWithPtr (MidiConfig fp) f = withForeignPtr fp (\p -> f (coerce p))
+mcWithPtr (MidiConfig fp) f = withForeignPtr fp (f . coerce)
 
 mcMalloc :: IO MidiConfig
 mcMalloc = coerce (mallocForeignPtrBytes0 #{size libremidi_midi_configuration})

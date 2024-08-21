@@ -86,7 +86,10 @@ library
   ld-options: -Wl,-keep_dwarf_unwind
   build-depends:
       base >=4.12 && <5
+    , free ==5.2.*
+    , mtl >=2.3.1 && <2.4
     , text >=2.0.2 && <2.1
+    , transformers >=0.6.1 && <0.7
   default-language: GHC2021
 
 executable libremidi-exe
@@ -129,8 +132,11 @@ executable libremidi-exe
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.12 && <5
+    , free ==5.2.*
     , libremidi
+    , mtl >=2.3.1 && <2.4
     , text >=2.0.2 && <2.1
+    , transformers >=0.6.1 && <0.7
   default-language: GHC2021
 
 test-suite libremidi-test
@@ -174,8 +180,11 @@ test-suite libremidi-test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.12 && <5
+    , free ==5.2.*
     , libremidi
+    , mtl >=2.3.1 && <2.4
     , tasty
     , tasty-hunit
     , text >=2.0.2 && <2.1
+    , transformers >=0.6.1 && <0.7
   default-language: GHC2021
