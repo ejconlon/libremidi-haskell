@@ -2,7 +2,7 @@ module Libremidi.Common where
 
 import Control.Exception (Exception)
 import Control.Monad (when)
-import Control.Monad.Except (ExceptT, MonadError (..), runExceptT)
+import Control.Monad.Except (ExceptT (..), MonadError (..), runExceptT)
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Trans.Free (FreeF (..), FreeT, MonadFree (..), liftF, runFreeT)
 import Data.Coerce (coerce)
@@ -56,15 +56,12 @@ cbMalloc g x = do
   fp <- FC.newForeignPtr (castFunPtrToPtr y) (freeHaskellFunPtr y)
   pure (Cb fp)
 
-newtype Field a b = Field (Ptr a -> b)
+newtype Field a b = Field (Ptr a -> Ptr b)
 
-mkField :: Int -> Field a (Ptr b)
+mkField :: Int -> Field a b
 mkField i = Field (`plusPtr` i)
 
-mkFunField :: Int -> Field a (FunPtr b)
-mkFunField i = Field (\pa -> castPtrToFunPtr (plusPtr pa i))
-
-pokeField :: (Storable b) => Field a (Ptr b) -> Ptr a -> b -> IO ()
+pokeField :: (Storable b) => Field a b -> Ptr a -> b -> IO ()
 pokeField (Field f) = poke . f
 
 ptrSize :: Int
@@ -91,35 +88,50 @@ newtype Err = Err CInt
 
 instance Exception Err
 
-data F a where
-  FCont :: (forall r. (a -> IO r) -> IO r) -> F a
+newtype ErrM a = ErrM {unErrM :: ExceptT Err IO a}
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadError Err)
 
-instance Functor F where
+runErrM :: ErrM a -> IO (Either Err a)
+runErrM = runExceptT . unErrM
+
+data ForeignF a where
+  ForeignFCont :: (forall r. (a -> ErrM r) -> ErrM r) -> ForeignF a
+
+instance Functor ForeignF where
   fmap f = \case
-    FCont k -> FCont (\g -> k (g . f))
+    ForeignFCont k -> ForeignFCont (\g -> k (g . f))
 
-newtype M a = M {unM :: ExceptT Err (FreeT F IO) a}
-  deriving newtype (Functor, Applicative, Monad, MonadFree F, MonadError Err, MonadIO)
+newtype ForeignM a = ForeignM {unForeignM :: ExceptT Err (FreeT ForeignF IO) a}
+  deriving newtype (Functor, Applicative, Monad, MonadFree ForeignF, MonadError Err, MonadIO)
 
-runM :: M a -> IO (Either Err a)
-runM (M m) = go (runExceptT m)
+runForeignM :: ForeignM a -> ErrM a
+runForeignM = go . runExceptT . unForeignM
  where
   go n = do
-    o <- runFreeT n
+    o <- liftIO (runFreeT n)
     case o of
-      Pure a -> pure a
-      Free fa -> case fa of
-        FCont k -> k go
+      Pure ea -> ErrM (ExceptT (pure ea))
+      Free f -> case f of
+        ForeignFCont k -> k go
 
-useM :: (forall r. (a -> IO r) -> IO r) -> M a
-useM k = liftF (FCont k)
+errM :: ErrM a -> ForeignM a
+errM e = liftIO (runErrM e) >>= either throwError pure
 
-guardM :: IO Err -> M ()
+abuseM :: (forall r. (a -> ErrM r) -> ErrM r) -> ForeignM a
+abuseM k = liftF (ForeignFCont k)
+
+useM :: (forall r. (a -> IO r) -> IO r) -> ForeignM a
+useM k = abuseM (\f -> ErrM (ExceptT (k (runErrM . f))))
+
+scopeM :: ForeignM a -> ForeignM a
+scopeM m = liftIO (runErrM (runForeignM m)) >>= either throwError pure
+
+guardM :: IO Err -> ForeignM ()
 guardM eact = do
   e@(Err x) <- liftIO eact
   when (x /= 0) (throwError e)
 
-textM :: (Ptr CString -> Ptr CSize -> IO Err) -> M Text
+textM :: (Ptr CString -> Ptr CSize -> IO Err) -> ForeignM Text
 textM f = do
   sptr <- useM allocaPtr
   lptr <- useM alloca
@@ -129,13 +141,13 @@ textM f = do
     l <- peek lptr
     TF.fromPtr (coerce s) (fromIntegral l)
 
-takeM :: (Ptr (Ptr x) -> IO Err) -> M (ForeignPtr x)
+takeM :: (Ptr (Ptr x) -> IO Err) -> ForeignM (ForeignPtr x)
 takeM f = do
   ptr <- useM allocaPtr
   guardM (f (coerce ptr))
   liftIO (takePtr ptr)
 
-assocM :: (AssocPtr fp) => fp -> M (PtrAssoc fp)
+assocM :: (AssocPtr fp) => fp -> ForeignM (PtrAssoc fp)
 assocM fp = useM (withAssocPtr fp)
 
 toCBool :: Bool -> CBool

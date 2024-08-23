@@ -1,24 +1,21 @@
 module Libremidi where
 
+import Control.Monad ((>=>))
 import Control.Monad.IO.Class (liftIO)
 import Data.Coerce (coerce)
 import Data.Foldable (traverse_)
 import Data.Proxy (Proxy (..))
 import Data.Text (Text)
 import Data.Text.Foreign qualified as TF
-import Foreign.Ptr (Ptr)
+import Foreign.Ptr (Ptr, nullPtr)
 import Libremidi.Common
-  ( AssocPtr (..)
-  , BitEnum (..)
+  ( BitEnum (..)
   , CallbackPtr (..)
-  , Err
-  , M
+  , ForeignM
   , MallocPtr (..)
   , assocM
+  , guardM
   , pokeField
-  , runM
-  , takeM
-  , textM
   , toCBool
   )
 import Libremidi.Foreign qualified as F
@@ -68,29 +65,6 @@ data Version
 
 instance BitEnum F.Version Version
 
-ipClone :: Ptr F.InPortX -> M F.InPort
-ipClone ip = do
-  fp <- takeM (F.libremidi_midi_in_port_clone ip)
-  pure (F.InPort fp)
-
-ipName :: Ptr F.InPortX -> M Text
-ipName ip = do
-  textM (F.libremidi_midi_in_port_name ip)
-
-opClone :: Ptr F.OutPortX -> M F.OutPort
-opClone op = do
-  fp <- takeM (F.libremidi_midi_out_port_clone op)
-  pure (F.OutPort fp)
-
-opName :: Ptr F.OutPortX -> M Text
-opName op = do
-  textM (F.libremidi_midi_out_port_name op)
-
-obsNew :: Ptr F.ObsConfigX -> Ptr F.ApiConfigX -> M F.ObsHandle
-obsNew oc ac = do
-  fp <- takeM (F.libremidi_midi_observer_new oc ac)
-  pure (F.ObsHandle fp)
-
 data LogLvl = LogLvlWarn | LogLvlErr
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
@@ -99,6 +73,13 @@ data LogEv = LogEv
   , leMsg :: !Text
   }
   deriving stock (Eq, Ord, Show)
+
+type LogCb = LogEv -> IO ()
+
+mkLogCb :: LogCb -> LogLvl -> IO F.LogCb
+mkLogCb f lvl = callbackPtr $ \_ s l _ -> do
+  msg <- TF.fromPtr (coerce s) (fromIntegral l)
+  f (LogEv lvl msg)
 
 data IfaceAct = IfaceActAdd | IfaceActRem
   deriving stock (Eq, Ord, Show, Enum, Bounded)
@@ -112,20 +93,23 @@ data IfaceEv = IfaceEv
   }
   deriving stock (Eq, Show)
 
-type LogCb = LogEv -> IO ()
-
 type IfaceCb = IfaceEv -> IO ()
 
-mkLogCb :: LogCb -> LogLvl -> IO F.LogCb
-mkLogCb f lvl = callbackPtr $ \_ s l _ -> do
-  msg <- TF.fromPtr (coerce s) (fromIntegral l)
-  f (LogEv lvl msg)
+mkIfaceInCb :: IfaceCb -> IfaceAct -> IO F.InCb
+mkIfaceInCb f act = callbackPtr (\_ p -> f (IfaceEv act (IfacePortIn p)))
 
-mkInCb :: IfaceCb -> IfaceAct -> IO F.InCb
-mkInCb f act = callbackPtr (\_ p -> f (IfaceEv act (IfacePortIn p)))
+mkIfaceOutCb :: IfaceCb -> IfaceAct -> IO F.OutCb
+mkIfaceOutCb f act = callbackPtr (\_ p -> f (IfaceEv act (IfacePortOut p)))
 
-mkOutCb :: IfaceCb -> IfaceAct -> IO F.OutCb
-mkOutCb f act = callbackPtr (\_ p -> f (IfaceEv act (IfacePortOut p)))
+type EnumInCb = Ptr F.InPortX -> IO ()
+
+mkEnumInCb :: EnumInCb -> IO F.InCb
+mkEnumInCb f = callbackPtr (\_ p -> f p)
+
+type EnumOutCb = Ptr F.OutPortX -> IO ()
+
+mkEnumOutCb :: EnumOutCb -> IO F.OutCb
+mkEnumOutCb f = callbackPtr (\_ p -> f p)
 
 data ObsConfig = ObsConfig
   { ocOnErr :: !(Maybe F.LogCb)
@@ -167,10 +151,10 @@ setLogCb f oc = do
 
 setIfaceCb :: IfaceCb -> ObsConfig -> IO ObsConfig
 setIfaceCb f oc = do
-  inAdd <- mkInCb f IfaceActAdd
-  inRem <- mkInCb f IfaceActRem
-  outAdd <- mkOutCb f IfaceActAdd
-  outRem <- mkOutCb f IfaceActRem
+  inAdd <- mkIfaceInCb f IfaceActAdd
+  inRem <- mkIfaceInCb f IfaceActRem
+  outAdd <- mkIfaceOutCb f IfaceActAdd
+  outRem <- mkIfaceOutCb f IfaceActRem
   pure $
     oc
       { ocInAdd = Just inAdd
@@ -179,48 +163,55 @@ setIfaceCb f oc = do
       , ocOutRem = Just outRem
       }
 
-touchObsConfig :: ObsConfig -> IO ()
-touchObsConfig oc = do
-  traverse_ touchAssocPtr (ocOnErr oc)
-  traverse_ touchAssocPtr (ocOnWarn oc)
-  traverse_ touchAssocPtr (ocInAdd oc)
-  traverse_ touchAssocPtr (ocInRem oc)
-  traverse_ touchAssocPtr (ocOutAdd oc)
-  traverse_ touchAssocPtr (ocOutRem oc)
+-- touchObsConfig :: ObsConfig -> IO ()
+-- touchObsConfig oc = do
+--   traverse_ touchAssocPtr (ocOnErr oc)
+--   traverse_ touchAssocPtr (ocOnWarn oc)
+--   traverse_ touchAssocPtr (ocInAdd oc)
+--   traverse_ touchAssocPtr (ocInRem oc)
+--   traverse_ touchAssocPtr (ocOutAdd oc)
+--   traverse_ touchAssocPtr (ocOutRem oc)
 
-withObsConfig :: ObsConfig -> (Ptr F.ObsConfigX -> M a) -> IO (Either Err a)
-withObsConfig oc f = do
-  a <- runM $ do
-    foc <- liftIO (mallocPtr (Proxy @F.ObsConfig))
-    poc <- assocM foc
-    -- TODO set callbacks
-    -- traverse_ (assocM >=> liftIO . pokeField F.cocOnErrCb coc . coerce) (ocOnErr oc)
-    liftIO $ do
-      pokeField F.ocTrackHardware poc (toCBool (ocTrackHardware oc))
-      pokeField F.ocTrackVirtual poc (toCBool (ocTrackVirtual oc))
-      pokeField F.ocTrackAny poc (toCBool (ocTrackAny oc))
-      pokeField F.ocNotifInCon poc (toCBool (ocNotifInCon oc))
-    f poc
-  liftIO (touchObsConfig oc)
-  pure a
+mkObsConfig :: ObsConfig -> ForeignM F.ObsConfig
+mkObsConfig oc = do
+  foc <- liftIO (mallocPtr (Proxy @F.ObsConfig))
+  poc <- assocM foc
+  traverse_ (assocM >=> liftIO . pokeField F.ocOnErr poc) (ocOnErr oc)
+  traverse_ (assocM >=> liftIO . pokeField F.ocOnWarn poc) (ocOnWarn oc)
+  traverse_ (assocM >=> liftIO . pokeField F.ocInAdd poc) (ocInAdd oc)
+  traverse_ (assocM >=> liftIO . pokeField F.ocInRem poc) (ocInRem oc)
+  traverse_ (assocM >=> liftIO . pokeField F.ocOutAdd poc) (ocOutAdd oc)
+  traverse_ (assocM >=> liftIO . pokeField F.ocOutRem poc) (ocOutRem oc)
+  liftIO $ do
+    pokeField F.ocTrackHardware poc (toCBool (ocTrackHardware oc))
+    pokeField F.ocTrackVirtual poc (toCBool (ocTrackVirtual oc))
+    pokeField F.ocTrackAny poc (toCBool (ocTrackAny oc))
+    pokeField F.ocNotifInCon poc (toCBool (ocNotifInCon oc))
+  pure foc
 
--- TODO expose these
--- libremidi_midi_observer_enumerate_input_ports :: CObsHandle -> Ptr Void -> CInCb -> IO CErr
--- libremidi_midi_enumerate_output_ports :: CObsHandle -> Ptr Void -> COutCb -> IO CErr
--- libremidi_midi_in_new :: CMidiConfig -> CApiConfig -> Ptr CInHandle -> IO CErr
--- libremidi_midi_in_is_connected :: CInHandle -> IO CErr
--- libremidi_midi_in_absolute_timestamp :: CInHandle -> IO CTimestamp
--- libremidi_midi_in_free :: CInHandle -> IO CErr
--- libremidi_midi_out_new :: CMidiConfig -> CApiConfig -> Ptr COutHandle -> IO CErr
--- libremidi_midi_out_is_connected :: COutHandle -> IO CErr
--- libremidi_midi_out_send_message :: COutHandle -> CMsg1 -> CSize -> IO CErr
--- libremidi_midi_out_send_ump ::  COutHandle -> CMsg2 -> CSize -> IO CErr
--- libremidi_midi_out_schedule_message :: COutHandle -> CTimestamp -> CMsg1 -> CSize  -> IO CErr
--- libremidi_midi_out_schedule_ump :: COutHandle -> CTimestamp -> CMsg2 -> CSize -> IO CErr
---
+listInputPorts :: F.ObsHandle -> EnumInCb -> ForeignM ()
+listInputPorts (F.ObsHandle foh) f = do
+  enumIn <- liftIO (mkEnumInCb f)
+  poh <- assocM foh
+  fun <- assocM enumIn
+  guardM (F.libremidi_midi_observer_enumerate_input_ports poh nullPtr fun)
+
 -- DONE
--- libremidi_midi_in_port_clone :: CInPort -> Ptr CInPort -> IO CErr
--- libremidi_midi_in_port_name :: CInPort -> Ptr CString -> Ptr CSize -> IO CErr
--- libremidi_midi_out_port_clone :: COutPort -> Ptr COutPort -> IO CErr
--- libremidi_midi_out_port_name :: COutPort -> Ptr CString -> Ptr CSize -> IO CErr
--- libremidi_midi_observer_new :: CObsConfig -> CApiConfig -> Ptr CObsHandle -> IO CErr
+-- libremidi_midi_in_port_clone :: Ptr InPortX -> Ptr (Ptr InPortX) -> IO Err
+-- libremidi_midi_in_port_name :: Ptr InPortX -> Ptr CString -> Ptr CSize -> IO Err
+-- libremidi_midi_out_port_clone :: Ptr OutPortX -> Ptr (Ptr OutPortX) -> IO Err
+-- libremidi_midi_out_port_name :: Ptr OutPortX -> Ptr CString -> Ptr CSize -> IO Err
+-- libremidi_midi_observer_new :: Ptr ObsConfigX -> Ptr ApiConfigX -> Ptr (Ptr ObsHandleX) -> IO Err
+-- libremidi_midi_observer_enumerate_input_ports :: Ptr ObsHandleX -> Ptr Void -> FunPtr InFun -> IO Err
+-- TODO
+-- libremidi_midi_enumerate_output_ports :: Ptr ObsHandleX -> Ptr Void -> FunPtr OutFun -> IO Err
+-- libremidi_midi_in_new :: Ptr MidiConfigX -> Ptr ApiConfigX -> Ptr (Ptr InHandleX) -> IO Err
+-- libremidi_midi_in_is_connected :: Ptr InHandleX -> IO CBool
+-- libremidi_midi_in_absolute_timestamp :: Ptr InHandleX -> IO Timestamp
+-- libremidi_midi_in_free :: Ptr InHandleX -> IO Err
+-- libremidi_midi_out_new :: Ptr MidiConfigX -> Ptr ApiConfigX -> Ptr (Ptr OutHandleX) -> IO Err
+-- libremidi_midi_out_is_connected :: Ptr OutHandleX -> IO CBool
+-- libremidi_midi_out_send_message :: Ptr OutHandleX -> Msg1 -> CSize -> IO Err
+-- libremidi_midi_out_send_ump ::  Ptr OutHandleX -> Msg2 -> CSize -> IO Err
+-- libremidi_midi_out_schedule_message :: Ptr OutHandleX -> Timestamp -> Msg1 -> CSize  -> IO Err
+-- libremidi_midi_out_schedule_ump :: Ptr OutHandleX -> Timestamp -> Msg2 -> CSize -> IO Err
