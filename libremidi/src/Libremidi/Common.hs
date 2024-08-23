@@ -1,21 +1,23 @@
 module Libremidi.Common where
 
 import Control.Exception (Exception)
-import Control.Monad (when)
+import Control.Monad (when, (>=>))
 import Control.Monad.Except (ExceptT, MonadError (..), runExceptT)
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Trans.Free (FreeF (..), FreeT, MonadFree (..), liftF, runFreeT)
 import Data.Coerce (coerce)
+import Data.Kind (Type)
+import Data.Proxy (Proxy)
 import Data.Text (Text)
 import Data.Text.Foreign qualified as TF
 import Foreign.C.String (CString)
-import Foreign.C.Types (CInt, CSize)
+import Foreign.C.Types (CBool (..), CInt, CSize)
 import Foreign.Concurrent qualified as FC
-import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtrBytes, newForeignPtr, withForeignPtr)
+import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtrBytes, newForeignPtr, touchForeignPtr, withForeignPtr)
 import Foreign.Marshal.Alloc (allocaBytes, finalizerFree)
 import Foreign.Marshal.Utils (fillBytes)
 import Foreign.Ptr (FunPtr, Ptr, castFunPtrToPtr, castPtrToFunPtr, freeHaskellFunPtr, nullPtr)
-import Foreign.Storable (peek, poke)
+import Foreign.Storable (Storable (..))
 
 class (Integral a, Enum b, Bounded b) => BitEnum a b | b -> a where
   fromBitEnum :: a -> b
@@ -23,13 +25,27 @@ class (Integral a, Enum b, Bounded b) => BitEnum a b | b -> a where
   toBitEnum :: b -> a
   toBitEnum = fromIntegral . fromEnum
 
-class AssocPtr fp p | fp -> p, fp -> p where
-  withAssocPtr :: fp -> (p -> IO a) -> IO a
+class AssocPtr (fp :: Type) where
+  type PtrAssoc fp :: Type
+  withAssocPtr :: fp -> (PtrAssoc fp -> IO a) -> IO a
+  touchAssocPtr :: fp -> IO ()
 
-instance AssocPtr (ForeignPtr x) (Ptr x) where
+instance AssocPtr (ForeignPtr x) where
+  type PtrAssoc (ForeignPtr x) = Ptr x
   withAssocPtr = withForeignPtr
+  touchAssocPtr = touchForeignPtr
+
+class (AssocPtr fp) => MallocPtr (fp :: Type) where
+  mallocPtr :: Proxy fp -> IO fp
+
+class (AssocPtr fp) => CallbackPtr (fp :: Type) where
+  type PtrCallback fp :: Type
+  callbackPtr :: PtrCallback fp -> IO fp
 
 type Field a b = a -> Ptr b
+
+pokeField :: (Storable b) => Field a b -> a -> b -> IO ()
+pokeField f = poke . f
 
 ptrSize :: Int
 ptrSize = 8 -- hope you're on a 64-bit machine!
@@ -53,6 +69,12 @@ cbMalloc g x = do
   y <- g x
   fp <- FC.newForeignPtr (castFunPtrToPtr y) (freeHaskellFunPtr y)
   pure (Cb fp)
+
+cbTouch :: Cb x -> IO ()
+cbTouch = touchForeignPtr . unCb
+
+-- cbPoke :: Storable b => Field a b -> a -> Cb b -> IO ()
+-- cbPoke f a cb = withAssocPtr cb (\p ->poke (f a) p)
 
 takePtr :: Ptr (Ptr x) -> IO (ForeignPtr x)
 takePtr pptr = do
@@ -112,5 +134,10 @@ takeM f = do
   guardM (f (coerce ptr))
   liftIO (takePtr ptr)
 
-assocM :: (AssocPtr fp p) => fp -> M p
+assocM :: (AssocPtr fp) => fp -> M (PtrAssoc fp)
 assocM fp = useM (withAssocPtr fp)
+
+toCBool :: Bool -> CBool
+toCBool = \case
+  False -> CBool 0
+  True -> CBool 1
