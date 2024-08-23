@@ -6,6 +6,7 @@ import Data.Foldable (traverse_)
 import Data.Proxy (Proxy (..))
 import Data.Text (Text)
 import Data.Text.Foreign qualified as TF
+import Foreign.Ptr (Ptr)
 import Libremidi.Common
   ( AssocPtr (..)
   , BitEnum (..)
@@ -31,7 +32,7 @@ data TimestampMode
   | TimestampModeCustom
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
-instance BitEnum F.CTimestampMode TimestampMode
+instance BitEnum F.TimestampMode TimestampMode
 
 data Api
   = ApiUnspecified
@@ -50,7 +51,7 @@ data Api
   | ApiDummy
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
-instance BitEnum F.CApi Api
+instance BitEnum F.Api Api
 
 data ConfigType
   = ConfigTypeObserver
@@ -58,36 +59,36 @@ data ConfigType
   | ConfigTypeOutput
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
-instance BitEnum F.CConfigType ConfigType
+instance BitEnum F.ConfigType ConfigType
 
 data Version
   = VersionMidi1
   | VersionMidi2
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
-instance BitEnum F.CVersion Version
+instance BitEnum F.Version Version
 
-ipClone :: F.CInPort -> M F.InPort
+ipClone :: Ptr F.InPortX -> M F.InPort
 ipClone ip = do
-  fp <- takeM (F.libremidi_midi_in_port_clone ip . coerce)
+  fp <- takeM (F.libremidi_midi_in_port_clone ip)
   pure (F.InPort fp)
 
-ipName :: F.CInPort -> M Text
+ipName :: Ptr F.InPortX -> M Text
 ipName ip = do
-  textM (F.libremidi_midi_in_port_name (coerce ip))
+  textM (F.libremidi_midi_in_port_name ip)
 
-opClone :: F.COutPort -> M F.OutPort
+opClone :: Ptr F.OutPortX -> M F.OutPort
 opClone op = do
-  fp <- takeM (F.libremidi_midi_out_port_clone op . coerce)
+  fp <- takeM (F.libremidi_midi_out_port_clone op)
   pure (F.OutPort fp)
 
-opName :: F.COutPort -> M Text
+opName :: Ptr F.OutPortX -> M Text
 opName op = do
-  textM (F.libremidi_midi_out_port_name (coerce op))
+  textM (F.libremidi_midi_out_port_name op)
 
-obsNew :: F.CObsConfig -> F.CApiConfig -> M F.ObsHandle
+obsNew :: Ptr F.ObsConfigX -> Ptr F.ApiConfigX -> M F.ObsHandle
 obsNew oc ac = do
-  fp <- takeM (F.libremidi_midi_observer_new oc ac . coerce)
+  fp <- takeM (F.libremidi_midi_observer_new oc ac)
   pure (F.ObsHandle fp)
 
 data LogLvl = LogLvlWarn | LogLvlErr
@@ -102,7 +103,7 @@ data LogEv = LogEv
 data IfaceAct = IfaceActAdd | IfaceActRem
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
-data IfacePort = IfacePortIn !F.CInPort | IfacePortOut !F.COutPort
+data IfacePort = IfacePortIn !(Ptr F.InPortX) | IfacePortOut !(Ptr F.OutPortX)
   deriving stock (Eq, Show)
 
 data IfaceEv = IfaceEv
@@ -111,24 +112,20 @@ data IfaceEv = IfaceEv
   }
   deriving stock (Eq, Show)
 
-data ObsEv
-  = ObsEvLog !LogEv
-  | ObsEvIface !IfaceEv
-  deriving stock (Eq, Show)
+type LogCb = LogEv -> IO ()
 
-type ObsCb = ObsEv -> IO ()
+type IfaceCb = IfaceEv -> IO ()
 
--- type CLogCbFun = Ptr Void -> CString -> CSize -> Ptr Void -> IO ()
-mkLogCb :: ObsCb -> LogLvl -> IO F.LogCb
+mkLogCb :: LogCb -> LogLvl -> IO F.LogCb
 mkLogCb f lvl = callbackPtr $ \_ s l _ -> do
   msg <- TF.fromPtr (coerce s) (fromIntegral l)
-  f (ObsEvLog (LogEv lvl msg))
+  f (LogEv lvl msg)
 
-mkInCb :: ObsCb -> IfaceAct -> IO F.InCb
-mkInCb f act = callbackPtr (\_ p -> f (ObsEvIface (IfaceEv act (IfacePortIn p))))
+mkInCb :: IfaceCb -> IfaceAct -> IO F.InCb
+mkInCb f act = callbackPtr (\_ p -> f (IfaceEv act (IfacePortIn p)))
 
-mkOutCb :: ObsCb -> IfaceAct -> IO F.OutCb
-mkOutCb f act = callbackPtr (\_ p -> f (ObsEvIface (IfaceEv act (IfacePortOut p))))
+mkOutCb :: IfaceCb -> IfaceAct -> IO F.OutCb
+mkOutCb f act = callbackPtr (\_ p -> f (IfaceEv act (IfacePortOut p)))
 
 data ObsConfig = ObsConfig
   { ocOnErr :: !(Maybe F.LogCb)
@@ -158,19 +155,25 @@ defObsConfig =
     , ocNotifInCon = True
     }
 
-setObsCb :: ObsCb -> ObsConfig -> IO ObsConfig
-setObsCb f oc = do
+setLogCb :: LogCb -> ObsConfig -> IO ObsConfig
+setLogCb f oc = do
   onErr <- mkLogCb f LogLvlErr
   onWarn <- mkLogCb f LogLvlWarn
+  pure $
+    oc
+      { ocOnErr = Just onErr
+      , ocOnWarn = Just onWarn
+      }
+
+setIfaceCb :: IfaceCb -> ObsConfig -> IO ObsConfig
+setIfaceCb f oc = do
   inAdd <- mkInCb f IfaceActAdd
   inRem <- mkInCb f IfaceActRem
   outAdd <- mkOutCb f IfaceActAdd
   outRem <- mkOutCb f IfaceActRem
   pure $
     oc
-      { ocOnErr = Just onErr
-      , ocOnWarn = Just onWarn
-      , ocInAdd = Just inAdd
+      { ocInAdd = Just inAdd
       , ocInRem = Just inRem
       , ocOutAdd = Just outAdd
       , ocOutRem = Just outRem
@@ -185,28 +188,19 @@ touchObsConfig oc = do
   traverse_ touchAssocPtr (ocOutAdd oc)
   traverse_ touchAssocPtr (ocOutRem oc)
 
-withObsConfig :: ObsConfig -> (F.CObsConfig -> M a) -> IO (Either Err a)
+withObsConfig :: ObsConfig -> (Ptr F.ObsConfigX -> M a) -> IO (Either Err a)
 withObsConfig oc f = do
   a <- runM $ do
     foc <- liftIO (mallocPtr (Proxy @F.ObsConfig))
-    coc <- assocM foc
+    poc <- assocM foc
+    -- TODO set callbacks
     -- traverse_ (assocM >=> liftIO . pokeField F.cocOnErrCb coc . coerce) (ocOnErr oc)
     liftIO $ do
-      pokeField F.cocTrackHardware coc (toCBool (ocTrackHardware oc))
-      pokeField F.cocTrackVirtual coc (toCBool (ocTrackVirtual oc))
-      pokeField F.cocTrackAny coc (toCBool (ocTrackAny oc))
-      pokeField F.cocNotifInCon coc (toCBool (ocNotifInCon oc))
-    -- { ocOnErr = Nothing
-    -- , ocOnWarn = Nothing
-    -- , ocInAdd = Nothing
-    -- , ocInRem = Nothing
-    -- , ocOutAdd = Nothing
-    -- , ocOutRem = Nothing
-    -- , ocTrackHardware = True
-    -- , ocTrackVirtual = True
-    -- , ocTrackAny = True
-    -- , ocNotifyInConstructor = True
-    f coc
+      pokeField F.ocTrackHardware poc (toCBool (ocTrackHardware oc))
+      pokeField F.ocTrackVirtual poc (toCBool (ocTrackVirtual oc))
+      pokeField F.ocTrackAny poc (toCBool (ocTrackAny oc))
+      pokeField F.ocNotifInCon poc (toCBool (ocNotifInCon oc))
+    f poc
   liftIO (touchObsConfig oc)
   pure a
 

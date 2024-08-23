@@ -1,7 +1,7 @@
 module Libremidi.Common where
 
 import Control.Exception (Exception)
-import Control.Monad (when, (>=>))
+import Control.Monad (when)
 import Control.Monad.Except (ExceptT, MonadError (..), runExceptT)
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Trans.Free (FreeF (..), FreeT, MonadFree (..), liftF, runFreeT)
@@ -14,9 +14,9 @@ import Foreign.C.String (CString)
 import Foreign.C.Types (CBool (..), CInt, CSize)
 import Foreign.Concurrent qualified as FC
 import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtrBytes, newForeignPtr, touchForeignPtr, withForeignPtr)
-import Foreign.Marshal.Alloc (allocaBytes, finalizerFree)
+import Foreign.Marshal.Alloc (alloca, finalizerFree)
 import Foreign.Marshal.Utils (fillBytes)
-import Foreign.Ptr (FunPtr, Ptr, castFunPtrToPtr, castPtrToFunPtr, freeHaskellFunPtr, nullPtr)
+import Foreign.Ptr (FunPtr, Ptr, castFunPtrToPtr, castPtrToFunPtr, freeHaskellFunPtr, nullPtr, plusPtr)
 import Foreign.Storable (Storable (..))
 
 class (Integral a, Enum b, Bounded b) => BitEnum a b | b -> a where
@@ -42,27 +42,13 @@ class (AssocPtr fp) => CallbackPtr (fp :: Type) where
   type PtrCallback fp :: Type
   callbackPtr :: PtrCallback fp -> IO fp
 
-type Field a b = a -> Ptr b
-
-pokeField :: (Storable b) => Field a b -> a -> b -> IO ()
-pokeField f = poke . f
-
-ptrSize :: Int
-ptrSize = 8 -- hope you're on a 64-bit machine!
-
-mallocForeignPtrBytes0 :: Int -> IO (ForeignPtr a)
-mallocForeignPtrBytes0 len = do
-  fp <- mallocForeignPtrBytes len
-  withForeignPtr fp (\p -> fillBytes p 0 len)
-  pure fp
-
-allocaPtr :: (Ptr x -> IO a) -> IO a
-allocaPtr f = allocaBytes ptrSize (\p -> fillBytes p 0 ptrSize >> f p)
-
 newtype Cb x = Cb {unCb :: ForeignPtr x}
+  deriving stock (Eq, Show)
 
-cbWithPtr :: Cb x -> (FunPtr x -> IO a) -> IO a
-cbWithPtr (Cb fp) f = withForeignPtr fp (f . castPtrToFunPtr)
+instance AssocPtr (Cb x) where
+  type PtrAssoc (Cb x) = FunPtr x
+  withAssocPtr (Cb fp) f = withForeignPtr fp (f . castPtrToFunPtr)
+  touchAssocPtr = touchForeignPtr . unCb
 
 cbMalloc :: (x -> IO (FunPtr x)) -> x -> IO (Cb x)
 cbMalloc g x = do
@@ -70,11 +56,28 @@ cbMalloc g x = do
   fp <- FC.newForeignPtr (castFunPtrToPtr y) (freeHaskellFunPtr y)
   pure (Cb fp)
 
-cbTouch :: Cb x -> IO ()
-cbTouch = touchForeignPtr . unCb
+newtype Field a b = Field (Ptr a -> b)
 
--- cbPoke :: Storable b => Field a b -> a -> Cb b -> IO ()
--- cbPoke f a cb = withAssocPtr cb (\p ->poke (f a) p)
+mkField :: Int -> Field a (Ptr b)
+mkField i = Field (`plusPtr` i)
+
+mkFunField :: Int -> Field a (FunPtr b)
+mkFunField i = Field (\pa -> castPtrToFunPtr (plusPtr pa i))
+
+pokeField :: (Storable b) => Field a (Ptr b) -> Ptr a -> b -> IO ()
+pokeField (Field f) = poke . f
+
+ptrSize :: Int
+ptrSize = sizeOf nullPtr
+
+mallocForeignPtrBytes0 :: Int -> IO (ForeignPtr a)
+mallocForeignPtrBytes0 len = do
+  fp <- mallocForeignPtrBytes len
+  withForeignPtr fp (\p -> fillBytes p 0 len)
+  pure fp
+
+allocaPtr :: (Ptr (Ptr x) -> IO a) -> IO a
+allocaPtr f = alloca (\p -> poke p nullPtr >> f p)
 
 takePtr :: Ptr (Ptr x) -> IO (ForeignPtr x)
 takePtr pptr = do
@@ -83,9 +86,7 @@ takePtr pptr = do
   poke pptr nullPtr
   pure fp
 
-type CErr = CInt
-
-newtype Err = Err CErr
+newtype Err = Err CInt
   deriving stock (Eq, Ord, Show)
 
 instance Exception Err
@@ -113,22 +114,22 @@ runM (M m) = go (runExceptT m)
 useM :: (forall r. (a -> IO r) -> IO r) -> M a
 useM k = liftF (FCont k)
 
-guardM :: IO CErr -> M ()
+guardM :: IO Err -> M ()
 guardM eact = do
-  e <- liftIO eact
-  when (e /= 0) (throwError (Err e))
+  e@(Err x) <- liftIO eact
+  when (x /= 0) (throwError e)
 
-textM :: (Ptr CString -> Ptr CSize -> IO CErr) -> M Text
+textM :: (Ptr CString -> Ptr CSize -> IO Err) -> M Text
 textM f = do
   sptr <- useM allocaPtr
-  lptr <- useM allocaPtr
+  lptr <- useM alloca
   guardM (f sptr lptr)
   liftIO $ do
     s <- peek sptr
     l <- peek lptr
     TF.fromPtr (coerce s) (fromIntegral l)
 
-takeM :: (Ptr (Ptr x) -> IO CErr) -> M (ForeignPtr x)
+takeM :: (Ptr (Ptr x) -> IO Err) -> M (ForeignPtr x)
 takeM f = do
   ptr <- useM allocaPtr
   guardM (f (coerce ptr))
