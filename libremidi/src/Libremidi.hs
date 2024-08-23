@@ -189,12 +189,19 @@ mkObsConfig oc = do
     pokeField F.ocNotifInCon poc (toCBool (ocNotifInCon oc))
   pure foc
 
-listInputPorts :: F.ObsHandle -> EnumInCb -> ForeignM ()
-listInputPorts (F.ObsHandle foh) f = do
+listInPorts :: F.ObsHandle -> EnumInCb -> ForeignM ()
+listInPorts (F.ObsHandle foh) f = do
   enumIn <- liftIO (mkEnumInCb f)
   poh <- assocM foh
   fun <- assocM enumIn
   guardM (F.libremidi_midi_observer_enumerate_input_ports poh nullPtr fun)
+
+listOutPorts :: F.ObsHandle -> EnumOutCb -> ForeignM ()
+listOutPorts (F.ObsHandle foh) f = do
+  enumOut <- liftIO (mkEnumOutCb f)
+  poh <- assocM foh
+  fun <- assocM enumOut
+  guardM (F.libremidi_midi_observer_enumerate_output_ports poh nullPtr fun)
 
 -- DONE
 -- libremidi_midi_in_port_clone :: Ptr InPortX -> Ptr (Ptr InPortX) -> IO Err

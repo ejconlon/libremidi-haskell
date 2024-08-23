@@ -298,7 +298,7 @@ foreign import ccall "libremidi/libremidi-c.h"
   libremidi_midi_observer_enumerate_input_ports :: Ptr ObsHandleX -> Ptr Void -> FunPtr InFun -> IO Err
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_midi_enumerate_output_ports :: Ptr ObsHandleX -> Ptr Void -> FunPtr OutFun -> IO Err
+  libremidi_midi_observer_enumerate_output_ports :: Ptr ObsHandleX -> Ptr Void -> FunPtr OutFun -> IO Err
 
 foreign import ccall "libremidi/libremidi-c.h"
   libremidi_midi_in_new :: Ptr MidiConfigX -> Ptr ApiConfigX -> Ptr (Ptr InHandleX) -> IO Err
