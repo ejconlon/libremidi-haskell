@@ -26,6 +26,7 @@ library
   exposed-modules:
       Libremidi
       Libremidi.Common
+      Libremidi.Easy
       Libremidi.Foreign
   other-modules:
       Paths_libremidi
@@ -86,6 +87,7 @@ library
   ld-options: -Wl,-keep_dwarf_unwind
   build-depends:
       base >=4.12 && <5
+    , containers >=0.6.7 && <0.7
     , data-default >=0.7.1.1 && <0.8
     , free ==5.2.*
     , mtl >=2.3.1 && <2.4
@@ -133,6 +135,7 @@ executable libremidi-exe
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.12 && <5
+    , containers >=0.6.7 && <0.7
     , data-default >=0.7.1.1 && <0.8
     , free ==5.2.*
     , libremidi
@@ -182,6 +185,7 @@ test-suite libremidi-test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.12 && <5
+    , containers >=0.6.7 && <0.7
     , data-default >=0.7.1.1 && <0.8
     , free ==5.2.*
     , libremidi

@@ -1,16 +1,16 @@
 module Libremidi where
 
-import Data.Default (Default (..))
 import Control.Monad ((>=>))
 import Control.Monad.IO.Class (liftIO)
 import Data.Coerce (coerce)
+import Data.Default (Default (..))
 import Data.Foldable (traverse_)
+import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy (..))
 import Data.Text (Text)
 import Data.Text.Foreign qualified as TF
 import Foreign.ForeignPtr (ForeignPtr)
 import Foreign.Ptr (Ptr, nullPtr)
-import Data.Maybe (fromMaybe)
 import Libremidi.Common
   ( BitEnum (..)
   , Cb
@@ -19,8 +19,8 @@ import Libremidi.Common
   , assocM
   , guardM
   , pokeField
-  , toCBool
   , scopeM
+  , toCBool
   )
 import Libremidi.Foreign qualified as F
 
@@ -76,7 +76,7 @@ type LogFun = LogLvl -> Text -> IO ()
 
 mkLogCb :: LogFun -> LogLvl -> IO (Cb F.LogFun)
 mkLogCb f lvl = F.mkLogCb $ \_ s l _ -> do
-  msg <- TF.fromPtr (coerce s) (fromIntegral l)
+  msg <- liftIO (TF.fromPtr (coerce s) (fromIntegral l))
   f lvl msg
 
 data ObsAct = ObsActAdd | ObsActRem
@@ -107,18 +107,19 @@ data ObsConfigBuilder = ObsConfigBuilder
   deriving stock (Eq, Show)
 
 instance Default ObsConfigBuilder where
-  def = ObsConfigBuilder
-    { ocbOnErr = Nothing
-    , ocbOnWarn = Nothing
-    , ocbInAdd = Nothing
-    , ocbInRem = Nothing
-    , ocbOutAdd = Nothing
-    , ocbOutRem = Nothing
-    , ocbTrackHardware = True
-    , ocbTrackVirtual = True
-    , ocbTrackAny = True
-    , ocbNotifInCon = True
-    }
+  def =
+    ObsConfigBuilder
+      { ocbOnErr = Nothing
+      , ocbOnWarn = Nothing
+      , ocbInAdd = Nothing
+      , ocbInRem = Nothing
+      , ocbOutAdd = Nothing
+      , ocbOutRem = Nothing
+      , ocbTrackHardware = True
+      , ocbTrackVirtual = True
+      , ocbTrackAny = True
+      , ocbNotifInCon = True
+      }
 
 ocbSetLogCb :: LogFun -> ObsConfigBuilder -> IO ObsConfigBuilder
 ocbSetLogCb f ocb = do
@@ -199,20 +200,21 @@ data MidiConfigBuilder = MidiConfigBuilder
   deriving stock (Eq, Show)
 
 instance Default MidiConfigBuilder where
-  def = MidiConfigBuilder
-    { mcbVersion = Nothing
-    , mcbPort  = Nothing
-    , mcbOnMsg = Nothing
-    , mcbGetTime = Nothing
-    , mcbOnErr = Nothing
-    , mcbOnWarn = Nothing
-    , mcbPortName = Nothing
-    , mcbVirtualPort = True
-    , mcbIgnoreSysex = False
-    , mcbIgnoreTiming = False
-    , mcbIgnoreSensing = True
-    , mcbTimestamps = TimestampModeAbsolute
-    }
+  def =
+    MidiConfigBuilder
+      { mcbVersion = Nothing
+      , mcbPort = Nothing
+      , mcbOnMsg = Nothing
+      , mcbGetTime = Nothing
+      , mcbOnErr = Nothing
+      , mcbOnWarn = Nothing
+      , mcbPortName = Nothing
+      , mcbVirtualPort = True
+      , mcbIgnoreSysex = False
+      , mcbIgnoreTiming = False
+      , mcbIgnoreSensing = True
+      , mcbTimestamps = TimestampModeAbsolute
+      }
 
 buildMidiConfig :: MidiConfigBuilder -> ForeignM (ForeignPtr F.MidiConfig)
 buildMidiConfig mcb = do
@@ -246,10 +248,11 @@ data ApiConfigBuilder = ApiConfigBuilder
   deriving stock (Eq, Show)
 
 instance Default ApiConfigBuilder where
-  def = ApiConfigBuilder
-    { acbApi = ApiUnspecified
-    , acbConfigType = ConfigTypeObserver
-    }
+  def =
+    ApiConfigBuilder
+      { acbApi = ApiUnspecified
+      , acbConfigType = ConfigTypeObserver
+      }
 
 buildApiConfig :: ApiConfigBuilder -> ForeignM (ForeignPtr F.ApiConfig)
 buildApiConfig acb = do
@@ -273,6 +276,12 @@ listOutPorts foh f = scopeM $ do
   poh <- assocM foh
   fun <- assocM enumOut
   guardM (F.libremidi_midi_observer_enumerate_output_ports poh nullPtr fun)
+
+newObsHandle :: ForeignPtr F.ObsConfig -> ForeignPtr F.ApiConfig -> ForeignM (ForeignPtr F.ObsHandle)
+newObsHandle foc fac = do
+  poc <- assocM foc
+  pac <- assocM fac
+  F.obsNew poc pac
 
 -- DONE
 -- libremidi_midi_in_port_clone :: Ptr InPortX -> Ptr (Ptr InPortX) -> IO Err
