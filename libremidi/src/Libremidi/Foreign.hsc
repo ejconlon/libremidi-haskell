@@ -163,10 +163,10 @@ instance MallocPtr MidiConfig where
 mcVersion :: Field MidiConfig Version
 mcVersion = mkField #{offset libremidi_midi_configuration, version}
 
-mcInPort :: Field MidiConfig InPort
+mcInPort :: Field MidiConfig (Ptr InPort)
 mcInPort = mkField #{offset libremidi_midi_configuration, in_port}
 
-mcOutPort :: Field MidiConfig OutPort
+mcOutPort :: Field MidiConfig (Ptr OutPort)
 mcOutPort = mkField #{offset libremidi_midi_configuration, out_port}
 
 mcOnMsg1 :: Field MidiConfig (FunPtr (MsgFun Sym1))

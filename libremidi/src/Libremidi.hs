@@ -10,6 +10,7 @@ import Data.Text (Text)
 import Data.Text.Foreign qualified as TF
 import Foreign.ForeignPtr (ForeignPtr)
 import Foreign.Ptr (Ptr, nullPtr)
+import Data.Maybe (fromMaybe)
 import Libremidi.Common
   ( BitEnum (..)
   , Cb
@@ -176,6 +177,11 @@ data MsgFun
   | MsgFun2 (Cb (F.MsgFun F.Sym2))
   deriving stock (Eq, Show)
 
+msgFunVersion :: MsgFun -> Version
+msgFunVersion = \case
+  MsgFun1 _ -> VersionMidi1
+  MsgFun2 _ -> VersionMidi2
+
 data MidiConfigBuilder = MidiConfigBuilder
   { mcbVersion :: !(Maybe Version)
   , mcbPort :: !(Maybe MidiPort)
@@ -209,7 +215,29 @@ instance Default MidiConfigBuilder where
     }
 
 buildMidiConfig :: MidiConfigBuilder -> ForeignM (ForeignPtr F.MidiConfig)
-buildMidiConfig = error "TODO"
+buildMidiConfig mcb = do
+  let ver = fromMaybe (maybe VersionMidi1 msgFunVersion (mcbOnMsg mcb)) (mcbVersion mcb)
+  fmc <- liftIO (mallocPtr (Proxy @F.MidiConfig))
+  pmc <- assocM fmc
+  case mcbPort mcb of
+    Just (MidiPortIn fip) -> assocM fip >>= liftIO . pokeField F.mcInPort pmc
+    Just (MidiPortOut fop) -> assocM fop >>= liftIO . pokeField F.mcOutPort pmc
+    Nothing -> pure ()
+  case mcbOnMsg mcb of
+    Just (MsgFun1 cb1) -> assocM cb1 >>= liftIO . pokeField F.mcOnMsg1 pmc
+    Just (MsgFun2 cb2) -> assocM cb2 >>= liftIO . pokeField F.mcOnMsg2 pmc
+    Nothing -> pure ()
+  traverse_ (assocM >=> liftIO . pokeField F.mcGetTime pmc) (mcbGetTime mcb)
+  traverse_ (assocM >=> liftIO . pokeField F.mcOnErr pmc) (mcbOnErr mcb)
+  traverse_ (assocM >=> liftIO . pokeField F.mcOnWarn pmc) (mcbOnWarn mcb)
+  liftIO $ do
+    pokeField F.mcVersion pmc (toBitEnum ver)
+    pokeField F.mcVirtualPort pmc (toCBool (mcbVirtualPort mcb))
+    pokeField F.mcIgnoreSysex pmc (toCBool (mcbIgnoreSysex mcb))
+    pokeField F.mcIgnoreTiming pmc (toCBool (mcbIgnoreTiming mcb))
+    pokeField F.mcIgnoreSensing pmc (toCBool (mcbIgnoreSensing mcb))
+    pokeField F.mcTimestamps pmc (toBitEnum (mcbTimestamps mcb))
+  pure fmc
 
 data ApiConfigBuilder = ApiConfigBuilder
   { acbApi :: !Api
@@ -229,6 +257,7 @@ buildApiConfig acb = do
   pac <- assocM fac
   liftIO $ do
     pokeField F.acApi pac (toBitEnum (acbApi acb))
+    pokeField F.acConfigType pac (toBitEnum (acbConfigType acb))
   pure fac
 
 listInPorts :: ForeignPtr F.ObsHandle -> EnumFun F.InPort -> ForeignM ()
