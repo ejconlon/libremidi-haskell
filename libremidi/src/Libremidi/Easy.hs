@@ -40,8 +40,7 @@ gatherEnumFun name clone r p = do
 newObsHandle :: C.ForeignM (ForeignPtr F.ObsHandle)
 newObsHandle = do
   oc <- liftIO (L.ocbSetLogCb printLogFun def) >>= L.buildObsConfig
-  ac <- L.buildApiConfig def
-  L.newObsHandle oc ac
+  L.newObsHandle L.ApiUnspecified oc
 
 listPorts
   :: (Ptr p -> C.ForeignM Text)

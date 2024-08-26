@@ -5,22 +5,29 @@ import Control.Monad.IO.Class (liftIO)
 import Data.Coerce (coerce)
 import Data.Default (Default (..))
 import Data.Foldable (traverse_)
+import Data.Int (Int64)
 import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy (..))
 import Data.Text (Text)
 import Data.Text.Foreign qualified as TF
-import Foreign.ForeignPtr (ForeignPtr)
+import Foreign.ForeignPtr (ForeignPtr, finalizeForeignPtr, withForeignPtr)
 import Foreign.Ptr (Ptr, nullPtr)
 import Libremidi.Common
   ( BitEnum (..)
   , Cb
+  , ErrM
   , ForeignM
   , MallocPtr (..)
   , assocM
+  , fromCBool
+  , fromCLong
   , guardM
   , pokeField
+  , runForeignM
   , scopeM
   , toCBool
+  , toCLong
+  , toCSize
   )
 import Libremidi.Foreign qualified as F
 
@@ -68,6 +75,8 @@ data Version
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
 instance BitEnum F.Version Version
+
+type Timestamp = Int64
 
 data LogLvl = LogLvlWarn | LogLvlErr
   deriving stock (Eq, Ord, Show, Enum, Bounded)
@@ -263,6 +272,17 @@ buildApiConfig acb = do
     pokeField F.acConfigType pac (toBitEnum (acbConfigType acb))
   pure fac
 
+newObsHandle :: Api -> ForeignPtr F.ObsConfig -> ForeignM (ForeignPtr F.ObsHandle)
+newObsHandle api foc = do
+  fac <- buildApiConfig (ApiConfigBuilder {acbApi = api, acbConfigType = ConfigTypeObserver})
+  pac <- assocM fac
+  poc <- assocM foc
+  F.obsNew poc pac
+
+-- Will be done automatically on GC but you can force it early
+freeObsHandle :: ForeignPtr F.ObsHandle -> IO ()
+freeObsHandle = finalizeForeignPtr
+
 listInPorts :: ForeignPtr F.ObsHandle -> EnumFun F.InPort -> ForeignM ()
 listInPorts foh f = scopeM $ do
   enumIn <- liftIO (mkEnumCb f)
@@ -277,28 +297,53 @@ listOutPorts foh f = scopeM $ do
   fun <- assocM enumOut
   guardM (F.libremidi_midi_observer_enumerate_output_ports poh nullPtr fun)
 
-newObsHandle :: ForeignPtr F.ObsConfig -> ForeignPtr F.ApiConfig -> ForeignM (ForeignPtr F.ObsHandle)
-newObsHandle foc fac = do
-  poc <- assocM foc
+newInHandle :: Api -> ForeignPtr F.MidiConfig -> ForeignM (ForeignPtr F.InHandle)
+newInHandle api fmc = do
+  fac <- buildApiConfig (ApiConfigBuilder {acbApi = api, acbConfigType = ConfigTypeInput})
   pac <- assocM fac
-  F.obsNew poc pac
+  pmc <- assocM fmc
+  F.inNew pmc pac
 
--- DONE
--- libremidi_midi_in_port_clone :: Ptr InPortX -> Ptr (Ptr InPortX) -> IO Err
--- libremidi_midi_in_port_name :: Ptr InPortX -> Ptr CString -> Ptr CSize -> IO Err
--- libremidi_midi_out_port_clone :: Ptr OutPortX -> Ptr (Ptr OutPortX) -> IO Err
--- libremidi_midi_out_port_name :: Ptr OutPortX -> Ptr CString -> Ptr CSize -> IO Err
--- libremidi_midi_observer_new :: Ptr ObsConfigX -> Ptr ApiConfigX -> Ptr (Ptr ObsHandleX) -> IO Err
--- libremidi_midi_observer_enumerate_input_ports :: Ptr ObsHandleX -> Ptr Void -> FunPtr InFun -> IO Err
--- libremidi_midi_enumerate_output_ports :: Ptr ObsHandleX -> Ptr Void -> FunPtr OutFun -> IO Err
--- libremidi_midi_in_free :: Ptr InHandleX -> IO Err
--- TODO
--- libremidi_midi_in_new :: Ptr MidiConfigX -> Ptr ApiConfigX -> Ptr (Ptr InHandleX) -> IO Err
--- libremidi_midi_in_is_connected :: Ptr InHandleX -> IO CBool
--- libremidi_midi_in_absolute_timestamp :: Ptr InHandleX -> IO Timestamp
--- libremidi_midi_out_new :: Ptr MidiConfigX -> Ptr ApiConfigX -> Ptr (Ptr OutHandleX) -> IO Err
--- libremidi_midi_out_is_connected :: Ptr OutHandleX -> IO CBool
--- libremidi_midi_out_send_message :: Ptr OutHandleX -> Msg1 -> CSize -> IO Err
--- libremidi_midi_out_send_ump ::  Ptr OutHandleX -> Msg2 -> CSize -> IO Err
--- libremidi_midi_out_schedule_message :: Ptr OutHandleX -> Timestamp -> Msg1 -> CSize  -> IO Err
--- libremidi_midi_out_schedule_ump :: Ptr OutHandleX -> Timestamp -> Msg2 -> CSize -> IO Err
+-- Will be done automatically on GC but you can force it early
+freeInHandle :: ForeignPtr F.InHandle -> IO ()
+freeInHandle = finalizeForeignPtr
+
+inIsConnected :: ForeignPtr F.InHandle -> IO Bool
+inIsConnected fih = withForeignPtr fih (fmap fromCBool . F.libremidi_midi_in_is_connected)
+
+inAbsTimestamp :: ForeignPtr F.InHandle -> IO Timestamp
+inAbsTimestamp fih = withForeignPtr fih (fmap fromCLong . F.libremidi_midi_in_absolute_timestamp)
+
+newOutHandle :: Api -> ForeignPtr F.MidiConfig -> ForeignM (ForeignPtr F.OutHandle)
+newOutHandle api fmc = do
+  fac <- buildApiConfig (ApiConfigBuilder {acbApi = api, acbConfigType = ConfigTypeOutput})
+  pac <- assocM fac
+  pmc <- assocM fmc
+  F.outNew pmc pac
+
+-- Will be done automatically on GC but you can do it early
+freeOutHandle :: ForeignPtr F.OutHandle -> IO ()
+freeOutHandle = finalizeForeignPtr
+
+outIsConnected :: ForeignPtr F.OutHandle -> IO Bool
+outIsConnected foh = withForeignPtr foh (fmap fromCBool . F.libremidi_midi_out_is_connected)
+
+outSendMsg1 :: ForeignPtr F.OutHandle -> Ptr F.Sym1 -> Int -> ErrM ()
+outSendMsg1 foh ptr len = runForeignM $ do
+  poh <- assocM foh
+  guardM (F.libremidi_midi_out_send_message poh ptr (toCSize (fromIntegral len)))
+
+outSchedMsg1 :: ForeignPtr F.OutHandle -> Timestamp -> Ptr F.Sym1 -> Int -> ErrM ()
+outSchedMsg1 foh ts ptr len = runForeignM $ do
+  poh <- assocM foh
+  guardM (F.libremidi_midi_out_schedule_message poh (toCLong ts) ptr (toCSize (fromIntegral len)))
+
+outSendMsg2 :: ForeignPtr F.OutHandle -> Ptr F.Sym2 -> Int -> ErrM ()
+outSendMsg2 foh ptr len = runForeignM $ do
+  poh <- assocM foh
+  guardM (F.libremidi_midi_out_send_ump poh ptr (toCSize (fromIntegral len)))
+
+outSchedMsg2 :: ForeignPtr F.OutHandle -> Timestamp -> Ptr F.Sym2 -> Int -> ErrM ()
+outSchedMsg2 foh ts ptr len = runForeignM $ do
+  poh <- assocM foh
+  guardM (F.libremidi_midi_out_schedule_ump poh (toCLong ts) ptr (toCSize (fromIntegral len)))

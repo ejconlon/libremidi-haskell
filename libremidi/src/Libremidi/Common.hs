@@ -6,12 +6,14 @@ import Control.Monad.Except (ExceptT (..), MonadError (..), runExceptT)
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Trans.Free (FreeF (..), FreeT, MonadFree (..), liftF, runFreeT)
 import Data.Coerce (coerce)
+import Data.Int (Int32, Int64)
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
 import Data.Text (Text)
 import Data.Text.Foreign qualified as TF
+import Data.Word (Word64)
 import Foreign.C.String (CString)
-import Foreign.C.Types (CBool (..), CInt, CSize)
+import Foreign.C.Types (CBool (..), CInt (..), CLong (..), CSize (..))
 import Foreign.Concurrent qualified as FC
 import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtrBytes, newForeignPtr, touchForeignPtr, withForeignPtr)
 import Foreign.Marshal.Alloc (alloca, finalizerFree)
@@ -150,3 +152,26 @@ toCBool :: Bool -> CBool
 toCBool = \case
   False -> CBool 0
   True -> CBool 1
+
+fromCBool :: CBool -> Bool
+fromCBool = \case
+  0 -> False
+  _ -> True
+
+fromCLong :: CLong -> Int64
+fromCLong (CLong x) = x
+
+toCLong :: Int64 -> CLong
+toCLong = CLong
+
+fromCInt :: CInt -> Int32
+fromCInt (CInt x) = x
+
+toCInt :: Int32 -> CInt
+toCInt = CInt
+
+fromCSize :: CSize -> Word64
+fromCSize (CSize x) = x
+
+toCSize :: Word64 -> CSize
+toCSize = CSize
