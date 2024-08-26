@@ -68,10 +68,6 @@ library
   include-dirs:
       vendor
   cxx-sources:
-      vendor/libremidi/backends/emscripten/midi_access.cpp
-      vendor/libremidi/backends/emscripten/midi_in.cpp
-      vendor/libremidi/backends/emscripten/midi_out.cpp
-      vendor/libremidi/backends/emscripten/observer.cpp
       vendor/libremidi/client.cpp
       vendor/libremidi/libremidi-c.cpp
       vendor/libremidi/libremidi.cpp
