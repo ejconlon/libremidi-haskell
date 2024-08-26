@@ -1,6 +1,6 @@
 cabal-version: 2.2
 
--- This file has been generated from package.yaml by hpack version 0.36.0.
+-- This file has been generated from package.yaml by hpack version 0.37.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -94,8 +94,8 @@ library
     ld-options: -Wl,-keep_dwarf_unwind
   if os(linux)
     cxx-options: -std=c++20 -DLIBREMIDI_PIPEWIRE=1
-    extra-libraries:
-        pipewire
+    pkgconfig-depends:
+        libpipewire-0.3
 
 executable libremidi-exe
   main-is: Main.hs

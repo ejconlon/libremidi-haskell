@@ -53,4 +53,6 @@ exe:
 vendor:
   rm -rf libremidi/vendor
   cp -r submodules/libremidi/include libremidi/vendor
+  cp submodules/readerwriterqueue/atomicops.h libremidi/vendor
+  cp submodules/readerwriterqueue/readerwriterqueue.h libremidi/vendor
 

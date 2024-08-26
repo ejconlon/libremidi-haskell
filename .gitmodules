@@ -1,3 +1,10 @@
 [submodule "submodules/libremidi"]
 	path = submodules/libremidi
 	url = https://github.com/celtera/libremidi.git
+
+; [submodule "submodules/readerwriterqueue"]
+; 	path = submodules/readerwriterqueue
+; 	url = https://github.com/cameron314/readerwriterqueue.git
+[submodule "submodules/readerwriterqueue"]
+	path = submodules/readerwriterqueue
+	url = https://github.com/cameron314/readerwriterqueue.git
