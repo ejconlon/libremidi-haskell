@@ -156,7 +156,7 @@ template <typename F>
 auto for_backend(libremidi::API api, F&& f)
 {
   static constexpr auto is_api
-      = [](auto& backend, libremidi::API api) { return backend.API == api; };
+      = [](auto& backend, libremidi::API api) { return backend.API == api || api == libremidi::API::UNSPECIFIED; };
   std::apply([&](auto&&... b) { ((is_api(b, api) && (f(b), true)) || ...); }, available_backends);
 }
 }
