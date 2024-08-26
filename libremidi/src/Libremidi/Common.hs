@@ -128,7 +128,7 @@ guardM eact = do
   when (x /= 0) (throwError e)
 
 textM :: (Ptr CString -> Ptr CSize -> IO Err) -> ForeignM Text
-textM f = do
+textM f = scopeM $ do
   sptr <- useM allocaPtr
   lptr <- useM alloca
   guardM (f sptr lptr)
@@ -138,7 +138,7 @@ textM f = do
     TF.fromPtr (coerce s) (fromIntegral l)
 
 takeM :: (Ptr (Ptr x) -> IO Err) -> ForeignM (ForeignPtr x)
-takeM f = do
+takeM f = scopeM $ do
   ptr <- useM allocaPtr
   guardM (f (coerce ptr))
   liftIO (takePtr ptr)

@@ -79,13 +79,13 @@ data ApiConfig
 instance MallocPtr ApiConfig where
   mallocPtr _ = mallocForeignPtrBytes0 #{size libremidi_api_configuration}
 
-acApi :: Field ApiConfig (Ptr Api)
+acApi :: Field ApiConfig Api
 acApi = mkField #{offset libremidi_api_configuration, api}
 
-acConfigType :: Field ApiConfig (Ptr ConfigType)
+acConfigType :: Field ApiConfig ConfigType
 acConfigType = mkField #{offset libremidi_api_configuration, configuration_type}
 
-acData :: Field ApiConfig (Ptr (Ptr Void))
+acData :: Field ApiConfig (Ptr Void)
 acData = mkField #{offset libremidi_api_configuration, data}
 
 type LogFun = Ptr Void -> CString -> CSize -> Ptr Void -> IO ()
@@ -267,4 +267,10 @@ opName = textM . libremidi_midi_out_port_name
 
 obsNew :: Ptr ObsConfig -> Ptr ApiConfig -> ForeignM (ForeignPtr ObsHandle)
 obsNew oc ac = takeM (libremidi_midi_observer_new oc ac)
+
+inNew :: Ptr MidiConfig -> Ptr ApiConfig -> ForeignM (ForeignPtr InHandle)
+inNew mc ac = takeM (libremidi_midi_in_new mc ac)
+
+outNew :: Ptr MidiConfig -> Ptr ApiConfig -> ForeignM (ForeignPtr OutHandle)
+outNew mc ac = takeM (libremidi_midi_out_new mc ac)
 
