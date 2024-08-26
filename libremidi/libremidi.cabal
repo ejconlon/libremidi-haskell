@@ -63,8 +63,7 @@ library
       TypeApplications
       TypeOperators
       TypeFamilies
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -pgmc=clang++
-  cxx-options: -std=c++20 -DLIBREMIDI_COREMIDI=1
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds
   include-dirs:
       vendor
   cxx-sources:
@@ -78,9 +77,6 @@ library
       vendor/libremidi/writer.cpp
   extra-libraries:
       stdc++
-  frameworks:
-      CoreMIDI CoreAudio CoreFoundation
-  ld-options: -Wl,-keep_dwarf_unwind
   build-depends:
       base >=4.12 && <5
     , containers >=0.6.7 && <0.7
@@ -90,6 +86,16 @@ library
     , text >=2.0.2 && <2.1
     , transformers >=0.6.1 && <0.7
   default-language: GHC2021
+  if os(darwin)
+    ghc-options: -pgmc=clang++
+    cxx-options: -std=c++20 -DLIBREMIDI_COREMIDI=1
+    frameworks:
+        CoreMIDI CoreAudio CoreFoundation
+    ld-options: -Wl,-keep_dwarf_unwind
+  if os(linux)
+    cxx-options: -std=c++20 -DLIBREMIDI_PIPEWIRE=1
+    extra-libraries:
+        pipewire
 
 executable libremidi-exe
   main-is: Main.hs
