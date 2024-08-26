@@ -7,10 +7,11 @@ import Data.Foldable (traverse_)
 import Data.Proxy (Proxy (..))
 import Data.Text (Text)
 import Data.Text.Foreign qualified as TF
+import Foreign.ForeignPtr (ForeignPtr)
 import Foreign.Ptr (Ptr, nullPtr)
 import Libremidi.Common
   ( BitEnum (..)
-  , CallbackPtr (..)
+  , Cb
   , ForeignM
   , MallocPtr (..)
   , assocM
@@ -68,61 +69,39 @@ instance BitEnum F.Version Version
 data LogLvl = LogLvlWarn | LogLvlErr
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
-data LogEv = LogEv
-  { leLvl :: !LogLvl
-  , leMsg :: !Text
-  }
-  deriving stock (Eq, Ord, Show)
+type LogFun = LogLvl -> Text -> IO ()
 
-type LogCb = LogEv -> IO ()
-
-mkLogCb :: LogCb -> LogLvl -> IO F.LogCb
-mkLogCb f lvl = callbackPtr $ \_ s l _ -> do
+mkLogCb :: LogFun -> LogLvl -> IO (Cb F.LogFun)
+mkLogCb f lvl = F.mkLogCb $ \_ s l _ -> do
   msg <- TF.fromPtr (coerce s) (fromIntegral l)
-  f (LogEv lvl msg)
+  f lvl msg
 
-data IfaceAct = IfaceActAdd | IfaceActRem
+data ObsAct = ObsActAdd | ObsActRem
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
-data IfacePort = IfacePortIn !(Ptr F.InPortX) | IfacePortOut !(Ptr F.OutPortX)
-  deriving stock (Eq, Show)
+type ObsFun p = ObsAct -> Ptr p -> IO ()
 
-data IfaceEv = IfaceEv
-  { ieAct :: !IfaceAct
-  , iePort :: !IfacePort
-  }
-  deriving stock (Eq, Show)
+mkObsCb :: ObsFun p -> ObsAct -> IO (Cb (F.ObsFun p))
+mkObsCb f = F.mkObsCb . const . f
 
-type IfaceCb = IfaceEv -> IO ()
+type EnumFun p = Ptr p -> IO ()
 
-mkIfaceInCb :: IfaceCb -> IfaceAct -> IO F.InCb
-mkIfaceInCb f act = callbackPtr (\_ p -> f (IfaceEv act (IfacePortIn p)))
-
-mkIfaceOutCb :: IfaceCb -> IfaceAct -> IO F.OutCb
-mkIfaceOutCb f act = callbackPtr (\_ p -> f (IfaceEv act (IfacePortOut p)))
-
-type EnumInCb = Ptr F.InPortX -> IO ()
-
-mkEnumInCb :: EnumInCb -> IO F.InCb
-mkEnumInCb f = callbackPtr (\_ p -> f p)
-
-type EnumOutCb = Ptr F.OutPortX -> IO ()
-
-mkEnumOutCb :: EnumOutCb -> IO F.OutCb
-mkEnumOutCb f = callbackPtr (\_ p -> f p)
+mkEnumCb :: EnumFun p -> IO (Cb (F.ObsFun p))
+mkEnumCb = F.mkObsCb . const
 
 data ObsConfig = ObsConfig
-  { ocOnErr :: !(Maybe F.LogCb)
-  , ocOnWarn :: !(Maybe F.LogCb)
-  , ocInAdd :: !(Maybe F.InCb)
-  , ocInRem :: !(Maybe F.InCb)
-  , ocOutAdd :: !(Maybe F.OutCb)
-  , ocOutRem :: !(Maybe F.OutCb)
+  { ocOnErr :: !(Maybe (Cb F.LogFun))
+  , ocOnWarn :: !(Maybe (Cb F.LogFun))
+  , ocInAdd :: !(Maybe (Cb (F.ObsFun F.InPort)))
+  , ocInRem :: !(Maybe (Cb (F.ObsFun F.InPort)))
+  , ocOutAdd :: !(Maybe (Cb (F.ObsFun F.OutPort)))
+  , ocOutRem :: !(Maybe (Cb (F.ObsFun F.OutPort)))
   , ocTrackHardware :: !Bool
   , ocTrackVirtual :: !Bool
   , ocTrackAny :: !Bool
   , ocNotifInCon :: !Bool
   }
+  deriving stock (Eq, Show)
 
 defObsConfig :: ObsConfig
 defObsConfig =
@@ -139,7 +118,7 @@ defObsConfig =
     , ocNotifInCon = True
     }
 
-setLogCb :: LogCb -> ObsConfig -> IO ObsConfig
+setLogCb :: LogFun -> ObsConfig -> IO ObsConfig
 setLogCb f oc = do
   onErr <- mkLogCb f LogLvlErr
   onWarn <- mkLogCb f LogLvlWarn
@@ -149,30 +128,27 @@ setLogCb f oc = do
       , ocOnWarn = Just onWarn
       }
 
-setIfaceCb :: IfaceCb -> ObsConfig -> IO ObsConfig
-setIfaceCb f oc = do
-  inAdd <- mkIfaceInCb f IfaceActAdd
-  inRem <- mkIfaceInCb f IfaceActRem
-  outAdd <- mkIfaceOutCb f IfaceActAdd
-  outRem <- mkIfaceOutCb f IfaceActRem
+setInPortCb :: ObsFun F.InPort -> ObsConfig -> IO ObsConfig
+setInPortCb f oc = do
+  onAdd <- mkObsCb f ObsActAdd
+  onRem <- mkObsCb f ObsActRem
   pure $
     oc
-      { ocInAdd = Just inAdd
-      , ocInRem = Just inRem
-      , ocOutAdd = Just outAdd
-      , ocOutRem = Just outRem
+      { ocInAdd = Just onAdd
+      , ocInRem = Just onRem
       }
 
--- touchObsConfig :: ObsConfig -> IO ()
--- touchObsConfig oc = do
---   traverse_ touchAssocPtr (ocOnErr oc)
---   traverse_ touchAssocPtr (ocOnWarn oc)
---   traverse_ touchAssocPtr (ocInAdd oc)
---   traverse_ touchAssocPtr (ocInRem oc)
---   traverse_ touchAssocPtr (ocOutAdd oc)
---   traverse_ touchAssocPtr (ocOutRem oc)
+setOutPortCb :: ObsFun F.OutPort -> ObsConfig -> IO ObsConfig
+setOutPortCb f oc = do
+  onAdd <- mkObsCb f ObsActAdd
+  onRem <- mkObsCb f ObsActRem
+  pure $
+    oc
+      { ocOutAdd = Just onAdd
+      , ocOutRem = Just onRem
+      }
 
-mkObsConfig :: ObsConfig -> ForeignM F.ObsConfig
+mkObsConfig :: ObsConfig -> ForeignM (ForeignPtr F.ObsConfig)
 mkObsConfig oc = do
   foc <- liftIO (mallocPtr (Proxy @F.ObsConfig))
   poc <- assocM foc
@@ -189,19 +165,79 @@ mkObsConfig oc = do
     pokeField F.ocNotifInCon poc (toCBool (ocNotifInCon oc))
   pure foc
 
-listInPorts :: F.ObsHandle -> EnumInCb -> ForeignM ()
-listInPorts (F.ObsHandle foh) f = do
-  enumIn <- liftIO (mkEnumInCb f)
+listInPorts :: ForeignPtr F.ObsHandle -> EnumFun F.InPort -> ForeignM ()
+listInPorts foh f = do
+  enumIn <- liftIO (mkEnumCb f)
   poh <- assocM foh
   fun <- assocM enumIn
   guardM (F.libremidi_midi_observer_enumerate_input_ports poh nullPtr fun)
 
-listOutPorts :: F.ObsHandle -> EnumOutCb -> ForeignM ()
-listOutPorts (F.ObsHandle foh) f = do
-  enumOut <- liftIO (mkEnumOutCb f)
+listOutPorts :: ForeignPtr F.ObsHandle -> EnumFun F.OutPort -> ForeignM ()
+listOutPorts foh f = do
+  enumOut <- liftIO (mkEnumCb f)
   poh <- assocM foh
   fun <- assocM enumOut
   guardM (F.libremidi_midi_observer_enumerate_output_ports poh nullPtr fun)
+
+data MidiPort
+  = MidiPortIn !(ForeignPtr F.InPort)
+  | MidiPortOut !(ForeignPtr F.OutPort)
+  deriving stock (Eq, Show)
+
+data MsgFun
+  = MsgFun1 (Cb (F.MsgFun F.Sym1))
+  | MsgFun2 (Cb (F.MsgFun F.Sym2))
+  deriving stock (Eq, Show)
+
+data MidiConfig = MidiConfig
+  { mcVersion :: !Version
+  , mcPort :: !(Maybe MidiPort)
+  , mcOnMsg :: !(Maybe MsgFun)
+  , mcGetTime :: !(Maybe (Cb F.TimeFun))
+  , mcOnErr :: !(Maybe (Cb F.LogFun))
+  , mcOnWarn :: !(Maybe (Cb F.LogFun))
+  , mcPortName :: !Text
+  , mcVirtualPort :: !Bool
+  , mcIgnoreSysex :: !Bool
+  , mcIgnoreTiming :: !Bool
+  , mcIgnoreSensing :: !Bool
+  , mcTimestamps :: !TimestampMode
+  }
+  deriving stock (Eq, Show)
+
+-- defMidiConfig :: MidiConfig
+-- defMidiConfig = MidiConfig
+--   { mcVersion = undefined
+--   , mcPort  = undefined
+--   , mcOutPort  = undefined
+--   , mcOnMsg1 = undefined
+--   , mcOnMsg2 = undefined
+--   , mcGetTime = undefined
+--   , mcOnErr = undefined
+--   , mcOnWarn = undefined
+--   , mcPortName = undefined
+--   , mcVirtualPort = undefined
+--   , mcIgnoreSysex = undefined
+--   , mcIgnoreTiming = undefined
+--   , mcIgnoreSensing = undefined
+--   , mcTimestamps = undefined
+--   }
+
+data ApiConfig = ApiConfig
+  { acApi :: !Api
+  , acConfigType :: !ConfigType
+  }
+  deriving stock (Eq, Show)
+
+defApiConfig :: ApiConfig
+defApiConfig =
+  ApiConfig
+    { acApi = ApiUnspecified
+    , acConfigType = ConfigTypeObserver
+    }
+
+mkInHandle :: MidiConfig -> ApiConfig -> ForeignM F.InHandle
+mkInHandle mc ac = undefined
 
 -- DONE
 -- libremidi_midi_in_port_clone :: Ptr InPortX -> Ptr (Ptr InPortX) -> IO Err
@@ -210,8 +246,8 @@ listOutPorts (F.ObsHandle foh) f = do
 -- libremidi_midi_out_port_name :: Ptr OutPortX -> Ptr CString -> Ptr CSize -> IO Err
 -- libremidi_midi_observer_new :: Ptr ObsConfigX -> Ptr ApiConfigX -> Ptr (Ptr ObsHandleX) -> IO Err
 -- libremidi_midi_observer_enumerate_input_ports :: Ptr ObsHandleX -> Ptr Void -> FunPtr InFun -> IO Err
--- TODO
 -- libremidi_midi_enumerate_output_ports :: Ptr ObsHandleX -> Ptr Void -> FunPtr OutFun -> IO Err
+-- TODO
 -- libremidi_midi_in_new :: Ptr MidiConfigX -> Ptr ApiConfigX -> Ptr (Ptr InHandleX) -> IO Err
 -- libremidi_midi_in_is_connected :: Ptr InHandleX -> IO CBool
 -- libremidi_midi_in_absolute_timestamp :: Ptr InHandleX -> IO Timestamp

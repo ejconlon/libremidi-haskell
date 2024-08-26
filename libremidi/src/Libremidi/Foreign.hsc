@@ -8,46 +8,10 @@ import Foreign.C.String (CString)
 import Data.Void (Void)
 import Foreign.Ptr (Ptr, FunPtr)
 import Foreign.ForeignPtr (ForeignPtr)
-import Data.Coerce (coerce)
-import Libremidi.Common (Err (..), AssocPtr (..), Field, Cb, mallocForeignPtrBytes0, cbMalloc, ptrSize, MallocPtr (..), CallbackPtr (..), mkField,  ForeignM, takeM, textM)
+import Libremidi.Common (Err (..), Field, Cb, mallocForeignPtrBytes0, cbMalloc, ptrSize, MallocPtr (..), mkField,  ForeignM, takeM, textM)
 import Data.Text (Text)
 
 #include "libremidi/libremidi-c.h"
-
-type Sym1 = CUChar
-type Msg1 = Ptr Sym1
-
-type Sym2 = CUInt
-type Msg2 = Ptr Sym2
-
-type Timestamp = CLong
-
-data InPortX
-newtype InPort = InPort { unInPort :: ForeignPtr InPortX }
-  deriving stock (Eq, Show)
-  deriving newtype (AssocPtr)
-
-data OutPortX
-newtype OutPort = OutPort { unOutPort :: ForeignPtr OutPortX }
-  deriving stock (Eq, Show)
-  deriving newtype (AssocPtr)
-
-data InHandleX
-newtype InHandle = InHandle { unInHandle :: ForeignPtr InHandleX }
-  deriving stock (Eq, Show)
-  deriving newtype (AssocPtr)
-
-data OutHandleX
-newtype OutHandle = OutHandle { unOutHandle :: ForeignPtr OutHandleX }
-  deriving stock (Eq, Show)
-  deriving newtype (AssocPtr)
-
-data ObsHandleX
-newtype ObsHandle = ObsHandle { unObsHandle :: ForeignPtr ObsHandleX }
-  deriving stock (Eq, Show)
-  deriving newtype (AssocPtr)
-
-type TimestampMode = CInt
 
 #{enum TimestampMode
  , CInt
@@ -96,13 +60,24 @@ type Version = CInt
  , verMidi2 = MIDI2
 }
 
-data ApiConfigX
-newtype ApiConfig = ApiConfig { unApiConfig :: ForeignPtr ApiConfigX }
-  deriving stock (Eq, Show)
-  deriving newtype (AssocPtr)
+type Sym1 = CUChar
+type Sym2 = CUInt
+
+type Timestamp = CLong
+
+data InPort
+data OutPort
+
+data InHandle
+data OutHandle
+data ObsHandle
+
+type TimestampMode = CInt
+
+data ApiConfig
 
 instance MallocPtr ApiConfig where
-  mallocPtr _ = coerce (mallocForeignPtrBytes0 #{size libremidi_api_configuration})
+  mallocPtr _ = mallocForeignPtrBytes0 #{size libremidi_api_configuration}
 
 acApi :: Field ApiConfig (Ptr Api)
 acApi = mkField #{offset libremidi_api_configuration, api}
@@ -118,238 +93,178 @@ type LogFun = Ptr Void -> CString -> CSize -> Ptr Void -> IO ()
 foreign import ccall "wrapper"
   logWrap :: LogFun -> IO (FunPtr LogFun)
 
-newtype LogCb = LogCb { unLogCb :: Cb LogFun }
-  deriving stock (Eq, Show)
-  deriving newtype (AssocPtr)
+mkLogCb :: LogFun -> IO (Cb LogFun)
+mkLogCb = cbMalloc logWrap
 
-instance CallbackPtr LogCb where
-  type PtrCallback LogCb = LogFun
-  callbackPtr = coerce . cbMalloc (coerce logWrap)
-
-type InFun = Ptr Void -> Ptr InPortX -> IO ()
+type ObsFun p = Ptr Void -> Ptr p -> IO ()
 
 foreign import ccall "wrapper"
-  inWrap :: InFun -> IO (FunPtr InFun)
+  obsWrap :: ObsFun p -> IO (FunPtr (ObsFun p))
 
-newtype InCb = InCb { unInCb :: Cb InFun }
-  deriving stock (Eq, Show)
-  deriving newtype (AssocPtr)
+mkObsCb :: ObsFun p -> IO (Cb (ObsFun p))
+mkObsCb = cbMalloc obsWrap
 
-instance CallbackPtr InCb where
-  type PtrCallback InCb = InFun
-  callbackPtr = coerce . cbMalloc (coerce inWrap)
-
-type OutFun = Ptr Void -> Ptr OutPortX -> IO ()
-
-foreign import ccall "wrapper"
-  outWrap :: OutFun -> IO (FunPtr OutFun)
-
-newtype OutCb = OutCb { unOutCb :: Cb OutFun }
-  deriving stock (Eq, Show)
-  deriving newtype (AssocPtr)
-
-instance CallbackPtr OutCb where
-  type PtrCallback OutCb = OutFun
-  callbackPtr = coerce . cbMalloc (coerce outWrap)
-
-data ObsConfigX
-newtype ObsConfig = ObsConfig { unObsConfig :: ForeignPtr ObsConfigX }
-  deriving stock (Eq, Show)
-  deriving newtype (AssocPtr)
+data ObsConfig
 
 instance MallocPtr ObsConfig where
-  mallocPtr _ = coerce (mallocForeignPtrBytes0 #{size libremidi_observer_configuration})
+  mallocPtr _ = mallocForeignPtrBytes0 #{size libremidi_observer_configuration}
 
-ocOnErr :: Field ObsConfigX (FunPtr LogFun)
+ocOnErr :: Field ObsConfig (FunPtr LogFun)
 ocOnErr = mkField (ptrSize + #{offset libremidi_observer_configuration, on_error})
 
-ocOnWarn :: Field ObsConfigX (FunPtr LogFun)
+ocOnWarn :: Field ObsConfig (FunPtr LogFun)
 ocOnWarn = mkField (ptrSize + #{offset libremidi_observer_configuration, on_warning})
 
-ocInAdd :: Field ObsConfigX (FunPtr InFun)
+ocInAdd :: Field ObsConfig (FunPtr (ObsFun InPort))
 ocInAdd = mkField (ptrSize + #{offset libremidi_observer_configuration, input_added})
 
-ocInRem :: Field ObsConfigX (FunPtr InFun)
+ocInRem :: Field ObsConfig (FunPtr (ObsFun InPort))
 ocInRem = mkField (ptrSize + #{offset libremidi_observer_configuration, input_removed})
 
-ocOutAdd :: Field ObsConfigX (FunPtr OutFun)
+ocOutAdd :: Field ObsConfig (FunPtr (ObsFun OutPort))
 ocOutAdd = mkField (ptrSize + #{offset libremidi_observer_configuration, input_added})
 
-ocOutRem :: Field ObsConfigX (FunPtr OutFun)
+ocOutRem :: Field ObsConfig (FunPtr (ObsFun OutPort))
 ocOutRem = mkField (ptrSize + #{offset libremidi_observer_configuration, input_removed})
 
-ocTrackHardware :: Field ObsConfigX CBool
+ocTrackHardware :: Field ObsConfig CBool
 ocTrackHardware = mkField #{offset libremidi_observer_configuration, track_hardware}
 
-ocTrackVirtual :: Field ObsConfigX CBool
+ocTrackVirtual :: Field ObsConfig CBool
 ocTrackVirtual = mkField #{offset libremidi_observer_configuration, track_virtual}
 
-ocTrackAny :: Field ObsConfigX CBool
+ocTrackAny :: Field ObsConfig CBool
 ocTrackAny = mkField #{offset libremidi_observer_configuration, track_any}
 
-ocNotifInCon :: Field ObsConfigX CBool
+ocNotifInCon :: Field ObsConfig CBool
 ocNotifInCon = mkField #{offset libremidi_observer_configuration, notify_in_constructor}
 
-type Msg1Fun = Ptr Void -> Msg1 -> CSize -> IO ()
+type MsgFun d = Ptr Void -> Ptr d -> CSize -> IO ()
 
 foreign import ccall "wrapper"
-  msg1Wrap :: Msg1Fun -> IO (FunPtr Msg1Fun)
+  msgWrap :: MsgFun d -> IO (FunPtr (MsgFun d))
 
-newtype Msg1Cb = Msg1Cb { unMsg1Cb :: Cb Msg1Fun }
-  deriving stock (Eq, Show)
-  deriving newtype (AssocPtr)
-
-instance CallbackPtr Msg1Cb where
-  type PtrCallback Msg1Cb = Msg1Fun
-  callbackPtr = coerce . cbMalloc (coerce msg1Wrap)
-
-type Msg2Fun = Ptr Void -> Msg2 -> CSize -> IO ()
-
-foreign import ccall "wrapper"
-  msg2Wrap :: Msg2Fun -> IO (FunPtr Msg2Fun)
-
-newtype Msg2Cb = Msg2Cb { unMsg2Cb :: Cb Msg2Fun }
-  deriving stock (Eq, Show)
-  deriving newtype (AssocPtr)
-
-instance CallbackPtr Msg2Cb where
-  type PtrCallback Msg2Cb = Msg2Fun
-  callbackPtr = coerce . cbMalloc (coerce msg2Wrap)
+mkMsgCb :: MsgFun d -> IO (Cb (MsgFun d))
+mkMsgCb = cbMalloc msgWrap
 
 type TimeFun = Ptr Void -> Timestamp -> IO ()
 
 foreign import ccall "wrapper"
   timeWrap :: TimeFun -> IO (FunPtr TimeFun)
 
-newtype TimeCb = TimeCb { unTimeCb :: Cb TimeFun }
-  deriving stock (Eq, Show)
-  deriving newtype (AssocPtr)
+mkTimeCb :: TimeFun -> IO (Cb TimeFun)
+mkTimeCb = cbMalloc timeWrap
 
-instance CallbackPtr TimeCb where
-  type PtrCallback TimeCb = TimeFun
-  callbackPtr = coerce . cbMalloc (coerce timeWrap)
-
-data MidiConfigX
-newtype MidiConfig = MidiConfig { unMidiConfig :: ForeignPtr MidiConfigX }
-  deriving stock (Eq, Show)
-  deriving newtype (AssocPtr)
+data MidiConfig
 
 instance MallocPtr MidiConfig where
-  mallocPtr _ = coerce (mallocForeignPtrBytes0 #{size libremidi_midi_configuration})
+  mallocPtr _ = mallocForeignPtrBytes0 #{size libremidi_midi_configuration}
 
-mcVersion :: Field MidiConfigX Version
+mcVersion :: Field MidiConfig Version
 mcVersion = mkField #{offset libremidi_midi_configuration, version}
 
-mcInPort :: Field MidiConfigX InPortX
+mcInPort :: Field MidiConfig InPort
 mcInPort = mkField #{offset libremidi_midi_configuration, in_port}
 
-mcOutPort :: Field MidiConfigX utPortX
+mcOutPort :: Field MidiConfig OutPort
 mcOutPort = mkField #{offset libremidi_midi_configuration, out_port}
 
-mcOnMsg1 :: Field MidiConfigX (FunPtr Msg1Fun)
+mcOnMsg1 :: Field MidiConfig (FunPtr (MsgFun Sym1))
 mcOnMsg1 = mkField #{offset libremidi_midi_configuration, on_midi1_message}
 
-mcOnMsg2 :: Field MidiConfigX (FunPtr Msg2Fun)
+mcOnMsg2 :: Field MidiConfig (FunPtr (MsgFun Sym2))
 mcOnMsg2 = mkField #{offset libremidi_midi_configuration, on_midi2_message}
 
-mcGetTime :: Field MidiConfigX (FunPtr TimeFun)
+mcGetTime :: Field MidiConfig (FunPtr TimeFun)
 mcGetTime = mkField #{offset libremidi_midi_configuration, get_timestamp}
 
-mcOnErr :: Field MidiConfigX (FunPtr LogFun)
+mcOnErr :: Field MidiConfig (FunPtr LogFun)
 mcOnErr = mkField #{offset libremidi_midi_configuration, on_error}
 
-mcOnWarn :: Field MidiConfigX (FunPtr LogFun)
+mcOnWarn :: Field MidiConfig (FunPtr LogFun)
 mcOnWarn = mkField #{offset libremidi_midi_configuration, on_warning}
 
-mcPortName :: Field MidiConfigX CString
+mcPortName :: Field MidiConfig CString
 mcPortName = mkField #{offset libremidi_midi_configuration, port_name}
 
-mcVirtualPort :: Field MidiConfigX CBool
+mcVirtualPort :: Field MidiConfig CBool
 mcVirtualPort = mkField #{offset libremidi_midi_configuration, virtual_port}
 
-mcIgnoreSysex :: Field MidiConfigX CBool
+mcIgnoreSysex :: Field MidiConfig CBool
 mcIgnoreSysex = mkField #{offset libremidi_midi_configuration, ignore_sysex}
 
-mcIgnoreTiming :: Field MidiConfigX CBool
+mcIgnoreTiming :: Field MidiConfig CBool
 mcIgnoreTiming = mkField #{offset libremidi_midi_configuration, ignore_timing}
 
-mcIgnoreSensing :: Field MidiConfigX CBool
+mcIgnoreSensing :: Field MidiConfig CBool
 mcIgnoreSensing = mkField #{offset libremidi_midi_configuration, ignore_sensing}
 
-mcTimestamps :: Field MidiConfigX TimestampMode
+mcTimestamps :: Field MidiConfig TimestampMode
 mcTimestamps = mkField #{offset libremidi_midi_configuration, timestamps}
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_midi_in_port_clone :: Ptr InPortX -> Ptr (Ptr InPortX) -> IO Err
+  libremidi_midi_in_port_clone :: Ptr InPort -> Ptr (Ptr InPort) -> IO Err
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_midi_in_port_name :: Ptr InPortX -> Ptr CString -> Ptr CSize -> IO Err
+  libremidi_midi_in_port_name :: Ptr InPort -> Ptr CString -> Ptr CSize -> IO Err
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_midi_out_port_clone :: Ptr OutPortX -> Ptr (Ptr OutPortX) -> IO Err
+  libremidi_midi_out_port_clone :: Ptr OutPort -> Ptr (Ptr OutPort) -> IO Err
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_midi_out_port_name :: Ptr OutPortX -> Ptr CString -> Ptr CSize -> IO Err
+  libremidi_midi_out_port_name :: Ptr OutPort -> Ptr CString -> Ptr CSize -> IO Err
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_midi_observer_new :: Ptr ObsConfigX -> Ptr ApiConfigX -> Ptr (Ptr ObsHandleX) -> IO Err
+  libremidi_midi_observer_new :: Ptr ObsConfig -> Ptr ApiConfig -> Ptr (Ptr ObsHandle) -> IO Err
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_midi_observer_enumerate_input_ports :: Ptr ObsHandleX -> Ptr Void -> FunPtr InFun -> IO Err
+  libremidi_midi_observer_enumerate_input_ports :: Ptr ObsHandle -> Ptr Void -> FunPtr (ObsFun InPort) -> IO Err
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_midi_observer_enumerate_output_ports :: Ptr ObsHandleX -> Ptr Void -> FunPtr OutFun -> IO Err
+  libremidi_midi_observer_enumerate_output_ports :: Ptr ObsHandle -> Ptr Void -> FunPtr (ObsFun OutPort) -> IO Err
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_midi_in_new :: Ptr MidiConfigX -> Ptr ApiConfigX -> Ptr (Ptr InHandleX) -> IO Err
+  libremidi_midi_in_new :: Ptr MidiConfig -> Ptr ApiConfig -> Ptr (Ptr InHandle) -> IO Err
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_midi_in_is_connected :: Ptr InHandleX -> IO CBool
+  libremidi_midi_in_is_connected :: Ptr InHandle -> IO CBool
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_midi_in_absolute_timestamp :: Ptr InHandleX -> IO Timestamp
+  libremidi_midi_in_absolute_timestamp :: Ptr InHandle -> IO Timestamp
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_midi_in_free :: Ptr InHandleX -> IO Err
+  libremidi_midi_in_free :: Ptr InHandle -> IO Err
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_midi_out_new :: Ptr MidiConfigX -> Ptr ApiConfigX -> Ptr (Ptr OutHandleX) -> IO Err
+  libremidi_midi_out_new :: Ptr MidiConfig -> Ptr ApiConfig -> Ptr (Ptr OutHandle) -> IO Err
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_midi_out_is_connected :: Ptr OutHandleX -> IO CBool
+  libremidi_midi_out_is_connected :: Ptr OutHandle -> IO CBool
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_midi_out_send_message :: Ptr OutHandleX -> Msg1 -> CSize -> IO Err
+  libremidi_midi_out_send_message :: Ptr OutHandle -> Ptr Sym1 -> CSize -> IO Err
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_midi_out_send_ump ::  Ptr OutHandleX -> Msg2 -> CSize -> IO Err
+  libremidi_midi_out_send_ump ::  Ptr OutHandle -> Ptr Sym2 -> CSize -> IO Err
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_midi_out_schedule_message :: Ptr OutHandleX -> Timestamp -> Msg1 -> CSize  -> IO Err
+  libremidi_midi_out_schedule_message :: Ptr OutHandle -> Timestamp -> Ptr Sym1 -> CSize  -> IO Err
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_midi_out_schedule_ump :: Ptr OutHandleX -> Timestamp -> Msg2 -> CSize -> IO Err
+  libremidi_midi_out_schedule_ump :: Ptr OutHandle -> Timestamp -> Ptr Sym2 -> CSize -> IO Err
 
-ipClone :: Ptr InPortX -> ForeignM InPort
-ipClone ip = do
-  fp <- takeM (libremidi_midi_in_port_clone ip)
-  pure (InPort fp)
+ipClone :: Ptr InPort -> ForeignM (ForeignPtr InPort)
+ipClone = takeM . libremidi_midi_in_port_clone
 
-ipName :: Ptr InPortX -> ForeignM Text
-ipName ip = do
-  textM (libremidi_midi_in_port_name ip)
+ipName :: Ptr InPort -> ForeignM Text
+ipName = textM . libremidi_midi_in_port_name
 
-opClone :: Ptr OutPortX -> ForeignM OutPort
-opClone op = do
-  fp <- takeM (libremidi_midi_out_port_clone op)
-  pure (OutPort fp)
+opClone :: Ptr OutPort -> ForeignM (ForeignPtr OutPort)
+opClone = takeM . libremidi_midi_out_port_clone
 
-opName :: Ptr OutPortX -> ForeignM Text
-opName op = do
-  textM (libremidi_midi_out_port_name op)
+opName :: Ptr OutPort -> ForeignM Text
+opName = textM . libremidi_midi_out_port_name
 
-obsNew :: Ptr ObsConfigX -> Ptr ApiConfigX -> ForeignM ObsHandle
-obsNew oc ac = do
-  fp <- takeM (libremidi_midi_observer_new oc ac)
-  pure (ObsHandle fp)
+obsNew :: Ptr ObsConfig -> Ptr ApiConfig -> ForeignM (ForeignPtr ObsHandle)
+obsNew oc ac = takeM (libremidi_midi_observer_new oc ac)
 

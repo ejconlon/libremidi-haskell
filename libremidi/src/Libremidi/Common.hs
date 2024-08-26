@@ -35,12 +35,8 @@ instance AssocPtr (ForeignPtr x) where
   withAssocPtr = withForeignPtr
   touchAssocPtr = touchForeignPtr
 
-class (AssocPtr fp) => MallocPtr (fp :: Type) where
-  mallocPtr :: Proxy fp -> IO fp
-
-class (AssocPtr fp) => CallbackPtr (fp :: Type) where
-  type PtrCallback fp :: Type
-  callbackPtr :: PtrCallback fp -> IO fp
+class MallocPtr (p :: Type) where
+  mallocPtr :: Proxy p -> IO (ForeignPtr p)
 
 newtype Cb x = Cb {unCb :: ForeignPtr x}
   deriving stock (Eq, Show)
