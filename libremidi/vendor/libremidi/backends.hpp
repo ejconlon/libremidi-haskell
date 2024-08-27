@@ -55,6 +55,7 @@
 #endif
 
 #include <libremidi/backends/dummy.hpp>
+#include <libremidi/backends/keyboard.hpp>
 
 namespace libremidi
 {
@@ -103,7 +104,7 @@ static constexpr auto available_backends = make_tl(
     pipewire::backend{}
 #endif
     ,
-    dummy_backend{});
+    kbd_backend{}, dummy_backend{});
 
 // There should always be at least one back-end.
 static_assert(std::tuple_size_v<decltype(available_backends)> >= 1);
@@ -118,7 +119,7 @@ template <typename F>
 auto for_backend(libremidi::API api, F&& f)
 {
   static constexpr auto is_api = [](auto& backend, libremidi::API api) {
-    return backend.available() && backend.API == api;
+    return backend.available() && (backend.API == api || libremidi::API::UNSPECIFIED == api);
   };
   std::apply([&](auto&&... b) { ((is_api(b, api) && (f(b), true)) || ...); }, available_backends);
 }
@@ -156,7 +157,7 @@ template <typename F>
 auto for_backend(libremidi::API api, F&& f)
 {
   static constexpr auto is_api
-      = [](auto& backend, libremidi::API api) { return backend.API == api || api == libremidi::API::UNSPECIFIED; };
+      = [](auto& backend, libremidi::API api) { return backend.API == api; };
   std::apply([&](auto&&... b) { ((is_api(b, api) && (f(b), true)) || ...); }, available_backends);
 }
 }
