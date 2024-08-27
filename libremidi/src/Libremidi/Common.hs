@@ -22,10 +22,8 @@ import Foreign.Ptr (FunPtr, Ptr, castFunPtrToPtr, castPtrToFunPtr, freeHaskellFu
 import Foreign.Storable (Storable (..))
 
 class (Integral a, Enum b, Bounded b) => BitEnum a b | b -> a where
-  fromBitEnum :: a -> b
-  fromBitEnum = toEnum . fromIntegral
+  fromBitEnum :: a -> Maybe b
   toBitEnum :: b -> a
-  toBitEnum = fromIntegral . fromEnum
 
 class AssocPtr (fp :: Type) where
   type PtrAssoc fp :: Type

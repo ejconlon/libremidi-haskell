@@ -40,7 +40,22 @@ data TimestampMode
   | TimestampModeCustom
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
-instance BitEnum F.TimestampMode TimestampMode
+instance BitEnum F.TimestampMode TimestampMode where
+  fromBitEnum = \case
+    a | a == F.tmNoTimestamp -> Just TimestampModeNone
+    a | a == F.tmRelative -> Just TimestampModeRelative
+    a | a == F.tmAbsolute -> Just TimestampModeAbsolute
+    a | a == F.tmSystemMonotonic -> Just TimestampModeSystemMono
+    a | a == F.tmAudioFrame -> Just TimestampModeAudioFrame
+    a | a == F.tmCustom -> Just TimestampModeCustom
+    _ -> Nothing
+  toBitEnum = \case
+    TimestampModeNone -> F.tmNoTimestamp
+    TimestampModeRelative -> F.tmRelative
+    TimestampModeAbsolute -> F.tmAbsolute
+    TimestampModeSystemMono -> F.tmSystemMonotonic
+    TimestampModeAudioFrame -> F.tmAudioFrame
+    TimestampModeCustom -> F.tmCustom
 
 data Api
   = ApiUnspecified
@@ -59,7 +74,38 @@ data Api
   | ApiDummy
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
-instance BitEnum F.Api Api
+instance BitEnum F.Api Api where
+  fromBitEnum = \case
+    a | a == F.apiUnspecified -> Just ApiUnspecified
+    a | a == F.apiCoremidi -> Just ApiCoremidi
+    a | a == F.apiAlsaSeq -> Just ApiAlsaSeq
+    a | a == F.apiAlsaRaw -> Just ApiAlsaRaw
+    a | a == F.apiJackMidi -> Just ApiJackMidi
+    a | a == F.apiWindowsMm -> Just ApiWindowsMm
+    a | a == F.apiWindowsUwp -> Just ApiWindowsUwp
+    a | a == F.apiWebmidi -> Just ApiWebmidi
+    a | a == F.apiPipewire -> Just ApiPipewire
+    a | a == F.apiAlsaRawUmp -> Just ApiAlsaRawUmp
+    a | a == F.apiAlsaSeqUmp -> Just ApiAlsaSeqUmp
+    a | a == F.apiCoremidiUmp -> Just ApiCoremidiUmp
+    a | a == F.apiWindowsMidiServices -> Just ApiWindowsMidiServices
+    a | a == F.apiDummy -> Just ApiDummy
+    _ -> Nothing
+  toBitEnum = \case
+    ApiUnspecified -> F.apiUnspecified
+    ApiCoremidi -> F.apiCoremidi
+    ApiAlsaSeq -> F.apiAlsaSeq
+    ApiAlsaRaw -> F.apiAlsaRaw
+    ApiJackMidi -> F.apiJackMidi
+    ApiWindowsMm -> F.apiWindowsMm
+    ApiWindowsUwp -> F.apiWindowsUwp
+    ApiWebmidi -> F.apiWebmidi
+    ApiPipewire -> F.apiPipewire
+    ApiAlsaRawUmp -> F.apiAlsaRawUmp
+    ApiAlsaSeqUmp -> F.apiAlsaSeqUmp
+    ApiCoremidiUmp -> F.apiCoremidiUmp
+    ApiWindowsMidiServices -> F.apiWindowsMidiServices
+    ApiDummy -> F.apiDummy
 
 data ConfigType
   = ConfigTypeObserver
@@ -67,14 +113,30 @@ data ConfigType
   | ConfigTypeOutput
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
-instance BitEnum F.ConfigType ConfigType
+instance BitEnum F.ConfigType ConfigType where
+  fromBitEnum = \case
+    a | a == F.ctObserver -> Just ConfigTypeObserver
+    a | a == F.ctInput -> Just ConfigTypeInput
+    a | a == F.ctOutput -> Just ConfigTypeOutput
+    _ -> Nothing
+  toBitEnum = \case
+    ConfigTypeObserver -> F.ctObserver
+    ConfigTypeInput -> F.ctInput
+    ConfigTypeOutput -> F.ctOutput
 
 data Version
   = VersionMidi1
   | VersionMidi2
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
-instance BitEnum F.Version Version
+instance BitEnum F.Version Version where
+  fromBitEnum = \case
+    a | a == F.verMidi1 -> Just VersionMidi1
+    a | a == F.verMidi2 -> Just VersionMidi2
+    _ -> Nothing
+  toBitEnum = \case
+    VersionMidi1 -> F.verMidi1
+    VersionMidi2 -> F.verMidi2
 
 type Timestamp = Int64
 
