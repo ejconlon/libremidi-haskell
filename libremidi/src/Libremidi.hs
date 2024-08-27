@@ -1,3 +1,7 @@
+-- | Mid-level interface to Libremidi
+-- Operations in IO do not fail
+-- Operations in ErrM can possibly fail
+-- Operations in ForeignM require cleanup
 module Libremidi where
 
 import Control.Monad ((>=>))

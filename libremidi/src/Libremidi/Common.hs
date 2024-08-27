@@ -21,10 +21,12 @@ import Foreign.Marshal.Utils (fillBytes)
 import Foreign.Ptr (FunPtr, Ptr, castFunPtrToPtr, castPtrToFunPtr, freeHaskellFunPtr, nullPtr, plusPtr)
 import Foreign.Storable (Storable (..))
 
+-- | Maps Haskell enums to C enums
 class (Integral a, Enum b, Bounded b) => BitEnum a b | b -> a where
   fromBitEnum :: a -> Maybe b
   toBitEnum :: b -> a
 
+-- | Generalizes ForeignPtr
 class AssocPtr (fp :: Type) where
   type PtrAssoc fp :: Type
   withAssocPtr :: fp -> (PtrAssoc fp -> IO a) -> IO a
@@ -35,9 +37,12 @@ instance AssocPtr (ForeignPtr x) where
   withAssocPtr = withForeignPtr
   touchAssocPtr = touchForeignPtr
 
+-- | Foreign types that have a meaningful initial state
 class MallocPtr (p :: Type) where
   mallocPtr :: Proxy p -> IO (ForeignPtr p)
 
+-- | Like a ForeignFunPtr
+-- We need to free the function pointer on finalization to not leak it
 newtype Cb x = Cb {unCb :: ForeignPtr x}
   deriving stock (Eq, Show)
 
@@ -46,12 +51,14 @@ instance AssocPtr (Cb x) where
   withAssocPtr (Cb fp) f = withForeignPtr fp (f . castPtrToFunPtr)
   touchAssocPtr = touchForeignPtr . unCb
 
+-- | Given an FFI wrapper function, allocate a callback
 cbMalloc :: (x -> IO (FunPtr x)) -> x -> IO (Cb x)
 cbMalloc g x = do
   y <- g x
   fp <- FC.newForeignPtr (castFunPtrToPtr y) (freeHaskellFunPtr y)
   pure (Cb fp)
 
+-- | A typed "accessor"
 newtype Field a b = Field (Ptr a -> Ptr b)
 
 mkField :: Int -> Field a b
@@ -79,11 +86,13 @@ takePtr pptr = do
   poke pptr nullPtr
   pure fp
 
+-- | Error code returned by API calls
 newtype Err = Err CInt
   deriving stock (Eq, Ord, Show)
 
 instance Exception Err
 
+-- | Computations that short-circuit on error
 newtype ErrM a = ErrM {unErrM :: ExceptT Err IO a}
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadError Err)
 
@@ -97,6 +106,7 @@ instance Functor ForeignF where
   fmap f = \case
     ForeignFCont k -> ForeignFCont (\g -> k (g . f))
 
+-- | Computations that allow cleanup actions and errors
 newtype ForeignM a = ForeignM {unForeignM :: ExceptT Err (FreeT ForeignF IO) a}
   deriving newtype (Functor, Applicative, Monad, MonadFree ForeignF, MonadError Err, MonadIO)
 
@@ -120,7 +130,7 @@ useM :: (forall r. (a -> IO r) -> IO r) -> ForeignM a
 useM k = abuseM (\f -> ErrM (ExceptT (k (runErrM . f))))
 
 scopeM :: ForeignM a -> ForeignM a
-scopeM m = liftIO (runErrM (runForeignM m)) >>= either throwError pure
+scopeM = errM . runForeignM
 
 guardM :: IO Err -> ForeignM ()
 guardM eact = do

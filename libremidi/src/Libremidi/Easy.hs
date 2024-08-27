@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+-- | High-level operations
 module Libremidi.Easy where
 
 import Control.Exception (throwIO)
