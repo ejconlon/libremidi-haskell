@@ -23,6 +23,7 @@ import Libremidi.Common
   , Field
   , MallocPtr (..)
   , UniquePtr
+  , assocM
   , checkM
   , consumeCb
   , consumeUniquePtr
@@ -36,7 +37,6 @@ import Libremidi.Common
   , toCSize
   , unRunErrM
   , withCb
-  , assocM
   )
 import Libremidi.Foreign qualified as LMF
 

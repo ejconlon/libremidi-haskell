@@ -18,13 +18,13 @@ import Libremidi.Api
   , LogLvl (..)
   , ObsHandle
   , OutPort
-  , cloneInPort
-  , cloneOutPort
+  , cloneInPort'
+  , cloneOutPort'
   , enumInPorts
   , enumOutPorts
-  , inPortName
+  , inPortName'
   , newObsHandle
-  , outPortName
+  , outPortName'
   , setObsLogCb
   )
 import Libremidi.Common (ErrM, rethrowErrM)
@@ -65,7 +65,7 @@ listPorts name clone list = do
   readIORef r
 
 listInPorts :: IO (Seq (Text, InPort))
-listInPorts = listPorts inPortName cloneInPort enumInPorts
+listInPorts = listPorts inPortName' cloneInPort' enumInPorts
 
 listOutPorts :: IO (Seq (Text, OutPort))
-listOutPorts = listPorts outPortName cloneOutPort enumOutPorts
+listOutPorts = listPorts outPortName' cloneOutPort' enumOutPorts

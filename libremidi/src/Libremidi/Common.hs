@@ -165,7 +165,7 @@ unRunErrM = ErrM . ExceptT
 rethrowErrM :: ErrM a -> IO a
 rethrowErrM m = runErrM m >>= either throwIO pure
 
-assocM :: AssocPtr x => (PtrAssoc x -> ErrM y) -> x -> ErrM y
+assocM :: (AssocPtr x) => (PtrAssoc x -> ErrM y) -> x -> ErrM y
 assocM f fp = unRunErrM (withAssocPtr fp (runErrM . f))
 
 checkM :: IO Err -> IO (Either Err ())
