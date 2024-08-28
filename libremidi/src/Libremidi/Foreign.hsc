@@ -1,7 +1,7 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE UndecidableInstances #-}
 
--- | Low-level bindings to libremidi
+-- | Low-level bindings to libremidi.
 module Libremidi.Foreign where
 
 import Foreign.C (CInt (..), CSize (..), CBool (..), CUInt (..), CLong (..), CUChar (..))

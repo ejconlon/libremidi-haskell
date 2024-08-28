@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | High-level operations
+-- | High-level operations.
 module Libremidi.Simple where
 
 import Data.Default (def)

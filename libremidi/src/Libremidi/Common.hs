@@ -165,13 +165,16 @@ unRunErrM = ErrM . ExceptT
 rethrowErrM :: ErrM a -> IO a
 rethrowErrM m = runErrM m >>= either throwIO pure
 
+assocM :: AssocPtr x => (PtrAssoc x -> ErrM y) -> x -> ErrM y
+assocM f fp = unRunErrM (withAssocPtr fp (runErrM . f))
+
 checkM :: IO Err -> IO (Either Err ())
 checkM one = do
   e@(Err x) <- liftIO one
   pure (if x == 0 then Right () else Left e)
 
-andThenM :: IO Err -> IO a -> IO (Either Err a)
-andThenM one two = do
+checkAndThenM :: IO Err -> IO a -> IO (Either Err a)
+checkAndThenM one two = do
   e@(Err x) <- liftIO one
   if x == 0
     then fmap Right two
@@ -181,7 +184,7 @@ textM :: (Ptr CString -> Ptr CSize -> IO Err) -> ErrM Text
 textM f = unRunErrM $
   allocaPtr $ \sptr -> do
     alloca $ \lptr -> do
-      andThenM (f sptr lptr) $ do
+      checkAndThenM (f sptr lptr) $ do
         s <- peek sptr
         l <- peek lptr
         TF.fromPtr (coerce s) (fromIntegral l)
@@ -189,7 +192,7 @@ textM f = unRunErrM $
 takeM :: (Ptr (Ptr x) -> IO Err) -> ErrM (ForeignPtr x)
 takeM f = unRunErrM $
   allocaPtr $ \pptr -> do
-    andThenM (f pptr) $ do
+    checkAndThenM (f pptr) $ do
       ptr <- peek pptr
       fp <- newForeignPtr finalizerFree ptr
       poke pptr nullPtr

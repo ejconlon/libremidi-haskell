@@ -1,6 +1,6 @@
--- | Mid-level interface to Libremidi
--- Operations in IO do not fail
--- Operations in ErrM can possibly fail
+-- | Mid-level interface to Libremidi.
+-- Operations in IO do not fail.
+-- Operations in ErrM can possibly fail.
 module Libremidi.Api where
 
 import Control.Monad.IO.Class (liftIO)
@@ -36,6 +36,7 @@ import Libremidi.Common
   , toCSize
   , unRunErrM
   , withCb
+  , assocM
   )
 import Libremidi.Foreign qualified as LMF
 
@@ -150,19 +151,31 @@ type Timestamp = Int64
 
 type InPort = ForeignPtr LMF.InPort
 
-cloneInPort :: Ptr LMF.InPort -> ErrM InPort
-cloneInPort = takeM . LMF.libremidi_midi_in_port_clone
+cloneInPort' :: Ptr LMF.InPort -> ErrM InPort
+cloneInPort' = takeM . LMF.libremidi_midi_in_port_clone
 
-inPortName :: Ptr LMF.InPort -> ErrM Text
-inPortName = textM . LMF.libremidi_midi_in_port_name
+cloneInPort :: InPort -> ErrM InPort
+cloneInPort = assocM cloneInPort'
+
+inPortName' :: Ptr LMF.InPort -> ErrM Text
+inPortName' = textM . LMF.libremidi_midi_in_port_name
+
+inPortName :: InPort -> ErrM Text
+inPortName = assocM inPortName'
 
 type OutPort = ForeignPtr LMF.OutPort
 
-cloneOutPort :: Ptr LMF.OutPort -> ErrM OutPort
-cloneOutPort = takeM . LMF.libremidi_midi_out_port_clone
+cloneOutPort' :: Ptr LMF.OutPort -> ErrM OutPort
+cloneOutPort' = takeM . LMF.libremidi_midi_out_port_clone
 
-outPortName :: Ptr LMF.OutPort -> ErrM Text
-outPortName = textM . LMF.libremidi_midi_out_port_name
+cloneOutPort :: OutPort -> ErrM OutPort
+cloneOutPort = assocM cloneOutPort'
+
+outPortName' :: Ptr LMF.OutPort -> ErrM Text
+outPortName' = textM . LMF.libremidi_midi_out_port_name
+
+outPortName :: OutPort -> ErrM Text
+outPortName = assocM outPortName'
 
 data LogLvl = LogLvlWarn | LogLvlErr
   deriving stock (Eq, Ord, Show, Enum, Bounded)
