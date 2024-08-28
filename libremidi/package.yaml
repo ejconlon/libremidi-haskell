@@ -21,6 +21,7 @@ dependencies:
 - text >= 2.0.2 && < 2.1
 - transformers >= 0.6.1 && < 0.7
 - free >= 5.2 && < 5.3
+- stm >= 2.5.1.0 && < 2.6
 
 library:
   source-dirs: src

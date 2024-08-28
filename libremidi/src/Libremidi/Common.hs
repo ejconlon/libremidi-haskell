@@ -1,11 +1,12 @@
 module Libremidi.Common where
 
-import Control.Exception (Exception)
-import Control.Monad (when)
+import Control.Concurrent.STM (atomically, retry, throwSTM)
+import Control.Concurrent.STM.TVar (TVar, newTVarIO, readTVar, writeTVar)
+import Control.Exception (Exception, finally, mask, mask_, throwIO)
 import Control.Monad.Except (ExceptT (..), MonadError (..), runExceptT)
 import Control.Monad.IO.Class (MonadIO (..))
-import Control.Monad.Trans.Free (FreeF (..), FreeT, MonadFree (..), liftF, runFreeT)
 import Data.Coerce (coerce)
+import Data.Foldable (traverse_)
 import Data.Int (Int32, Int64)
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
@@ -15,60 +16,11 @@ import Data.Word (Word64)
 import Foreign.C.String (CString)
 import Foreign.C.Types (CBool (..), CInt (..), CLong (..), CSize (..))
 import Foreign.Concurrent qualified as FC
-import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtrBytes, newForeignPtr, touchForeignPtr, withForeignPtr)
+import Foreign.ForeignPtr (ForeignPtr, finalizeForeignPtr, mallocForeignPtrBytes, newForeignPtr, withForeignPtr)
 import Foreign.Marshal.Alloc (alloca, finalizerFree)
 import Foreign.Marshal.Utils (fillBytes)
 import Foreign.Ptr (FunPtr, Ptr, castFunPtrToPtr, castPtrToFunPtr, freeHaskellFunPtr, nullPtr, plusPtr)
 import Foreign.Storable (Storable (..))
-
--- | Maps Haskell enums to C enums
-class (Integral a, Enum b, Bounded b) => BitEnum a b | b -> a where
-  fromBitEnum :: a -> Maybe b
-  toBitEnum :: b -> a
-
--- | Generalizes ForeignPtr
-class AssocPtr (fp :: Type) where
-  type PtrAssoc fp :: Type
-  withAssocPtr :: fp -> (PtrAssoc fp -> IO a) -> IO a
-  touchAssocPtr :: fp -> IO ()
-
-instance AssocPtr (ForeignPtr x) where
-  type PtrAssoc (ForeignPtr x) = Ptr x
-  withAssocPtr = withForeignPtr
-  touchAssocPtr = touchForeignPtr
-
--- | Foreign types that have a meaningful initial state
-class MallocPtr (p :: Type) where
-  mallocPtr :: Proxy p -> IO (ForeignPtr p)
-
--- | Like a ForeignFunPtr
--- We need to free the function pointer on finalization to not leak it
-newtype Cb x = Cb {unCb :: ForeignPtr x}
-  deriving stock (Eq, Show)
-
-instance AssocPtr (Cb x) where
-  type PtrAssoc (Cb x) = FunPtr x
-  withAssocPtr (Cb fp) f = withForeignPtr fp (f . castPtrToFunPtr)
-  touchAssocPtr = touchForeignPtr . unCb
-
--- | Given an FFI wrapper function, allocate a callback
-cbMalloc :: (x -> IO (FunPtr x)) -> x -> IO (Cb x)
-cbMalloc g x = do
-  y <- g x
-  fp <- FC.newForeignPtr (castFunPtrToPtr y) (freeHaskellFunPtr y)
-  pure (Cb fp)
-
--- | A typed "accessor"
-newtype Field a b = Field (Ptr a -> Ptr b)
-
-mkField :: Int -> Field a b
-mkField i = Field (`plusPtr` i)
-
-pokeField :: (Storable b) => Field a b -> Ptr a -> b -> IO ()
-pokeField (Field f) = poke . f
-
-ptrSize :: Int
-ptrSize = sizeOf nullPtr
 
 mallocForeignPtrBytes0 :: Int -> IO (ForeignPtr a)
 mallocForeignPtrBytes0 len = do
@@ -79,12 +31,120 @@ mallocForeignPtrBytes0 len = do
 allocaPtr :: (Ptr (Ptr x) -> IO a) -> IO a
 allocaPtr f = alloca (\p -> poke p nullPtr >> f p)
 
-takePtr :: Ptr (Ptr x) -> IO (ForeignPtr x)
-takePtr pptr = do
-  ptr <- peek pptr
-  fp <- newForeignPtr finalizerFree ptr
-  poke pptr nullPtr
-  pure fp
+ptrSize :: Int
+ptrSize = sizeOf nullPtr
+
+-- | A typed "accessor"
+newtype Field a b = Field (Ptr a -> Ptr b)
+
+newField :: Int -> Field a b
+newField i = Field (`plusPtr` i)
+
+pokeField :: (Storable b) => Field a b -> Ptr a -> b -> IO ()
+pokeField (Field f) = poke . f
+
+-- | Maps Haskell enums to C enums
+class (Integral a, Enum b, Bounded b) => BitEnum a b | b -> a where
+  fromBitEnum :: a -> Maybe b
+  toBitEnum :: b -> a
+
+-- | Generalizes ForeignPtr
+class AssocPtr (z :: Type) where
+  type PtrAssoc z :: Type
+  withAssocPtr :: z -> (PtrAssoc z -> IO a) -> IO a
+
+instance AssocPtr (ForeignPtr x) where
+  type PtrAssoc (ForeignPtr x) = Ptr x
+  withAssocPtr = withForeignPtr
+
+data Ref p
+  = RefUnlock !(ForeignPtr p)
+  | RefLock
+  | RefFree
+  deriving stock (Eq, Ord, Show)
+
+newtype UniquePtr p = UniquePtr
+  { unUniquePtr :: TVar (Ref p)
+  }
+  deriving stock (Eq)
+
+instance AssocPtr (UniquePtr x) where
+  type PtrAssoc (UniquePtr x) = Ptr x
+  withAssocPtr = withUniquePtr
+
+data FreeErr = FreeErr
+  deriving stock (Eq, Ord, Show)
+
+instance Exception FreeErr
+
+newUniquePtr :: ForeignPtr p -> IO (UniquePtr p)
+newUniquePtr = fmap UniquePtr . newTVarIO . RefUnlock
+
+freeUniquePtr :: UniquePtr p -> IO ()
+freeUniquePtr (UniquePtr v) = mask_ $ do
+  mfp <- atomically $ do
+    r <- readTVar v
+    case r of
+      RefUnlock fp -> do
+        writeTVar v RefFree
+        pure (Just fp)
+      RefLock -> retry
+      RefFree -> pure Nothing
+  traverse_ finalizeForeignPtr mfp
+
+withUniquePtr :: UniquePtr p -> (Ptr p -> IO a) -> IO a
+withUniquePtr (UniquePtr v) f = mask $ \restore -> do
+  fp <- atomically $ do
+    r <- readTVar v
+    case r of
+      RefUnlock fp -> do
+        writeTVar v RefLock
+        pure fp
+      RefLock -> retry
+      RefFree -> throwSTM FreeErr
+  finally
+    (restore (withForeignPtr fp f))
+    (atomically (writeTVar v (RefUnlock fp)))
+
+consumeUniquePtr :: UniquePtr p -> IO (ForeignPtr p)
+consumeUniquePtr (UniquePtr v) = atomically $ do
+  r <- readTVar v
+  case r of
+    RefUnlock fp -> do
+      writeTVar v RefFree
+      pure fp
+    RefLock -> retry
+    RefFree -> throwSTM FreeErr
+
+-- | Like a ForeignFunPtr
+-- We need to free the function pointer on finalization to not leak it
+newtype Cb x = Cb {unCb :: UniquePtr x}
+  deriving stock (Eq)
+
+instance AssocPtr (Cb x) where
+  type PtrAssoc (Cb x) = FunPtr x
+  withAssocPtr = withCb
+
+-- | Given an FFI wrapper function, allocate a callback
+newCb :: (x -> IO (FunPtr x)) -> x -> IO (Cb x)
+newCb w x = do
+  y <- w x
+  fp <- FC.newForeignPtr (castFunPtrToPtr y) (freeHaskellFunPtr y)
+  up <- newUniquePtr fp
+  pure (Cb up)
+
+freeCb :: Cb x -> IO ()
+freeCb = freeUniquePtr . unCb
+
+withCb :: Cb x -> (FunPtr x -> IO a) -> IO a
+withCb (Cb up) f = withUniquePtr up (f . castPtrToFunPtr)
+
+consumeCb :: Cb x -> IO (ForeignPtr x)
+consumeCb = consumeUniquePtr . unCb
+
+-- | Foreign types that have a meaningful initial state
+class MallocPtr (p :: Type) where
+  mallocPtr :: Proxy p -> IO (ForeignPtr p)
 
 -- | Error code returned by API calls
 newtype Err = Err CInt
@@ -99,62 +159,41 @@ newtype ErrM a = ErrM {unErrM :: ExceptT Err IO a}
 runErrM :: ErrM a -> IO (Either Err a)
 runErrM = runExceptT . unErrM
 
-data ForeignF a where
-  ForeignFCont :: (forall r. (a -> ErrM r) -> ErrM r) -> ForeignF a
+unRunErrM :: IO (Either Err a) -> ErrM a
+unRunErrM = ErrM . ExceptT
 
-instance Functor ForeignF where
-  fmap f = \case
-    ForeignFCont k -> ForeignFCont (\g -> k (g . f))
+rethrowErrM :: ErrM a -> IO a
+rethrowErrM m = runErrM m >>= either throwIO pure
 
--- | Computations that allow cleanup actions and errors
-newtype ForeignM a = ForeignM {unForeignM :: ExceptT Err (FreeT ForeignF IO) a}
-  deriving newtype (Functor, Applicative, Monad, MonadFree ForeignF, MonadError Err, MonadIO)
+checkM :: IO Err -> IO (Either Err ())
+checkM one = do
+  e@(Err x) <- liftIO one
+  pure (if x == 0 then Right () else Left e)
 
-runForeignM :: ForeignM a -> ErrM a
-runForeignM = go . runExceptT . unForeignM
- where
-  go n = do
-    o <- liftIO (runFreeT n)
-    case o of
-      Pure ea -> ErrM (ExceptT (pure ea))
-      Free f -> case f of
-        ForeignFCont k -> k go
+andThenM :: IO Err -> IO a -> IO (Either Err a)
+andThenM one two = do
+  e@(Err x) <- liftIO one
+  if x == 0
+    then fmap Right two
+    else pure (Left e)
 
-errM :: ErrM a -> ForeignM a
-errM e = liftIO (runErrM e) >>= either throwError pure
+textM :: (Ptr CString -> Ptr CSize -> IO Err) -> ErrM Text
+textM f = unRunErrM $
+  allocaPtr $ \sptr -> do
+    alloca $ \lptr -> do
+      andThenM (f sptr lptr) $ do
+        s <- peek sptr
+        l <- peek lptr
+        TF.fromPtr (coerce s) (fromIntegral l)
 
-abuseM :: (forall r. (a -> ErrM r) -> ErrM r) -> ForeignM a
-abuseM k = liftF (ForeignFCont k)
-
-useM :: (forall r. (a -> IO r) -> IO r) -> ForeignM a
-useM k = abuseM (\f -> ErrM (ExceptT (k (runErrM . f))))
-
-scopeM :: ForeignM a -> ForeignM a
-scopeM = errM . runForeignM
-
-guardM :: IO Err -> ForeignM ()
-guardM eact = do
-  e@(Err x) <- liftIO eact
-  when (x /= 0) (throwError e)
-
-textM :: (Ptr CString -> Ptr CSize -> IO Err) -> ForeignM Text
-textM f = scopeM $ do
-  sptr <- useM allocaPtr
-  lptr <- useM alloca
-  guardM (f sptr lptr)
-  liftIO $ do
-    s <- peek sptr
-    l <- peek lptr
-    TF.fromPtr (coerce s) (fromIntegral l)
-
-takeM :: (Ptr (Ptr x) -> IO Err) -> ForeignM (ForeignPtr x)
-takeM f = scopeM $ do
-  ptr <- useM allocaPtr
-  guardM (f (coerce ptr))
-  liftIO (takePtr ptr)
-
-assocM :: (AssocPtr fp) => fp -> ForeignM (PtrAssoc fp)
-assocM fp = useM (withAssocPtr fp)
+takeM :: (Ptr (Ptr x) -> IO Err) -> ErrM (ForeignPtr x)
+takeM f = unRunErrM $
+  allocaPtr $ \pptr -> do
+    andThenM (f pptr) $ do
+      ptr <- peek pptr
+      fp <- newForeignPtr finalizerFree ptr
+      poke pptr nullPtr
+      pure fp
 
 toCBool :: Bool -> CBool
 toCBool = \case
