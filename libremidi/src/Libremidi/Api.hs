@@ -37,7 +37,7 @@ import Libremidi.Common
   , unRunErrM
   , withCb
   )
-import Libremidi.Foreign qualified as F
+import Libremidi.Foreign qualified as LMF
 
 data TimestampMode
   = TimestampModeNone
@@ -48,22 +48,22 @@ data TimestampMode
   | TimestampModeCustom
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
-instance BitEnum F.TimestampMode TimestampMode where
+instance BitEnum LMF.TimestampMode TimestampMode where
   fromBitEnum = \case
-    a | a == F.tmNoTimestamp -> Just TimestampModeNone
-    a | a == F.tmRelative -> Just TimestampModeRelative
-    a | a == F.tmAbsolute -> Just TimestampModeAbsolute
-    a | a == F.tmSystemMonotonic -> Just TimestampModeSystemMono
-    a | a == F.tmAudioFrame -> Just TimestampModeAudioFrame
-    a | a == F.tmCustom -> Just TimestampModeCustom
+    a | a == LMF.tmNoTimestamp -> Just TimestampModeNone
+    a | a == LMF.tmRelative -> Just TimestampModeRelative
+    a | a == LMF.tmAbsolute -> Just TimestampModeAbsolute
+    a | a == LMF.tmSystemMonotonic -> Just TimestampModeSystemMono
+    a | a == LMF.tmAudioFrame -> Just TimestampModeAudioFrame
+    a | a == LMF.tmCustom -> Just TimestampModeCustom
     _ -> Nothing
   toBitEnum = \case
-    TimestampModeNone -> F.tmNoTimestamp
-    TimestampModeRelative -> F.tmRelative
-    TimestampModeAbsolute -> F.tmAbsolute
-    TimestampModeSystemMono -> F.tmSystemMonotonic
-    TimestampModeAudioFrame -> F.tmAudioFrame
-    TimestampModeCustom -> F.tmCustom
+    TimestampModeNone -> LMF.tmNoTimestamp
+    TimestampModeRelative -> LMF.tmRelative
+    TimestampModeAbsolute -> LMF.tmAbsolute
+    TimestampModeSystemMono -> LMF.tmSystemMonotonic
+    TimestampModeAudioFrame -> LMF.tmAudioFrame
+    TimestampModeCustom -> LMF.tmCustom
 
 data Api
   = ApiUnspecified
@@ -82,38 +82,38 @@ data Api
   | ApiDummy
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
-instance BitEnum F.Api Api where
+instance BitEnum LMF.Api Api where
   fromBitEnum = \case
-    a | a == F.apiUnspecified -> Just ApiUnspecified
-    a | a == F.apiCoremidi -> Just ApiCoremidi
-    a | a == F.apiAlsaSeq -> Just ApiAlsaSeq
-    a | a == F.apiAlsaRaw -> Just ApiAlsaRaw
-    a | a == F.apiJackMidi -> Just ApiJackMidi
-    a | a == F.apiWindowsMm -> Just ApiWindowsMm
-    a | a == F.apiWindowsUwp -> Just ApiWindowsUwp
-    a | a == F.apiWebmidi -> Just ApiWebmidi
-    a | a == F.apiPipewire -> Just ApiPipewire
-    a | a == F.apiAlsaRawUmp -> Just ApiAlsaRawUmp
-    a | a == F.apiAlsaSeqUmp -> Just ApiAlsaSeqUmp
-    a | a == F.apiCoremidiUmp -> Just ApiCoremidiUmp
-    a | a == F.apiWindowsMidiServices -> Just ApiWindowsMidiServices
-    a | a == F.apiDummy -> Just ApiDummy
+    a | a == LMF.apiUnspecified -> Just ApiUnspecified
+    a | a == LMF.apiCoremidi -> Just ApiCoremidi
+    a | a == LMF.apiAlsaSeq -> Just ApiAlsaSeq
+    a | a == LMF.apiAlsaRaw -> Just ApiAlsaRaw
+    a | a == LMF.apiJackMidi -> Just ApiJackMidi
+    a | a == LMF.apiWindowsMm -> Just ApiWindowsMm
+    a | a == LMF.apiWindowsUwp -> Just ApiWindowsUwp
+    a | a == LMF.apiWebmidi -> Just ApiWebmidi
+    a | a == LMF.apiPipewire -> Just ApiPipewire
+    a | a == LMF.apiAlsaRawUmp -> Just ApiAlsaRawUmp
+    a | a == LMF.apiAlsaSeqUmp -> Just ApiAlsaSeqUmp
+    a | a == LMF.apiCoremidiUmp -> Just ApiCoremidiUmp
+    a | a == LMF.apiWindowsMidiServices -> Just ApiWindowsMidiServices
+    a | a == LMF.apiDummy -> Just ApiDummy
     _ -> Nothing
   toBitEnum = \case
-    ApiUnspecified -> F.apiUnspecified
-    ApiCoremidi -> F.apiCoremidi
-    ApiAlsaSeq -> F.apiAlsaSeq
-    ApiAlsaRaw -> F.apiAlsaRaw
-    ApiJackMidi -> F.apiJackMidi
-    ApiWindowsMm -> F.apiWindowsMm
-    ApiWindowsUwp -> F.apiWindowsUwp
-    ApiWebmidi -> F.apiWebmidi
-    ApiPipewire -> F.apiPipewire
-    ApiAlsaRawUmp -> F.apiAlsaRawUmp
-    ApiAlsaSeqUmp -> F.apiAlsaSeqUmp
-    ApiCoremidiUmp -> F.apiCoremidiUmp
-    ApiWindowsMidiServices -> F.apiWindowsMidiServices
-    ApiDummy -> F.apiDummy
+    ApiUnspecified -> LMF.apiUnspecified
+    ApiCoremidi -> LMF.apiCoremidi
+    ApiAlsaSeq -> LMF.apiAlsaSeq
+    ApiAlsaRaw -> LMF.apiAlsaRaw
+    ApiJackMidi -> LMF.apiJackMidi
+    ApiWindowsMm -> LMF.apiWindowsMm
+    ApiWindowsUwp -> LMF.apiWindowsUwp
+    ApiWebmidi -> LMF.apiWebmidi
+    ApiPipewire -> LMF.apiPipewire
+    ApiAlsaRawUmp -> LMF.apiAlsaRawUmp
+    ApiAlsaSeqUmp -> LMF.apiAlsaSeqUmp
+    ApiCoremidiUmp -> LMF.apiCoremidiUmp
+    ApiWindowsMidiServices -> LMF.apiWindowsMidiServices
+    ApiDummy -> LMF.apiDummy
 
 data ConfigType
   = ConfigTypeObserver
@@ -121,56 +121,56 @@ data ConfigType
   | ConfigTypeOutput
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
-instance BitEnum F.ConfigType ConfigType where
+instance BitEnum LMF.ConfigType ConfigType where
   fromBitEnum = \case
-    a | a == F.ctObserver -> Just ConfigTypeObserver
-    a | a == F.ctInput -> Just ConfigTypeInput
-    a | a == F.ctOutput -> Just ConfigTypeOutput
+    a | a == LMF.ctObserver -> Just ConfigTypeObserver
+    a | a == LMF.ctInput -> Just ConfigTypeInput
+    a | a == LMF.ctOutput -> Just ConfigTypeOutput
     _ -> Nothing
   toBitEnum = \case
-    ConfigTypeObserver -> F.ctObserver
-    ConfigTypeInput -> F.ctInput
-    ConfigTypeOutput -> F.ctOutput
+    ConfigTypeObserver -> LMF.ctObserver
+    ConfigTypeInput -> LMF.ctInput
+    ConfigTypeOutput -> LMF.ctOutput
 
 data Version
   = VersionMidi1
   | VersionMidi2
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
-instance BitEnum F.Version Version where
+instance BitEnum LMF.Version Version where
   fromBitEnum = \case
-    a | a == F.verMidi1 -> Just VersionMidi1
-    a | a == F.verMidi2 -> Just VersionMidi2
+    a | a == LMF.verMidi1 -> Just VersionMidi1
+    a | a == LMF.verMidi2 -> Just VersionMidi2
     _ -> Nothing
   toBitEnum = \case
-    VersionMidi1 -> F.verMidi1
-    VersionMidi2 -> F.verMidi2
+    VersionMidi1 -> LMF.verMidi1
+    VersionMidi2 -> LMF.verMidi2
 
 type Timestamp = Int64
 
-type InPort = ForeignPtr F.InPort
+type InPort = ForeignPtr LMF.InPort
 
-cloneInPort :: Ptr F.InPort -> ErrM InPort
-cloneInPort = takeM . F.libremidi_midi_in_port_clone
+cloneInPort :: Ptr LMF.InPort -> ErrM InPort
+cloneInPort = takeM . LMF.libremidi_midi_in_port_clone
 
-inPortName :: Ptr F.InPort -> ErrM Text
-inPortName = textM . F.libremidi_midi_in_port_name
+inPortName :: Ptr LMF.InPort -> ErrM Text
+inPortName = textM . LMF.libremidi_midi_in_port_name
 
-type OutPort = ForeignPtr F.OutPort
+type OutPort = ForeignPtr LMF.OutPort
 
-cloneOutPort :: Ptr F.OutPort -> ErrM OutPort
-cloneOutPort = takeM . F.libremidi_midi_out_port_clone
+cloneOutPort :: Ptr LMF.OutPort -> ErrM OutPort
+cloneOutPort = takeM . LMF.libremidi_midi_out_port_clone
 
-outPortName :: Ptr F.OutPort -> ErrM Text
-outPortName = textM . F.libremidi_midi_out_port_name
+outPortName :: Ptr LMF.OutPort -> ErrM Text
+outPortName = textM . LMF.libremidi_midi_out_port_name
 
 data LogLvl = LogLvlWarn | LogLvlErr
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
 type LogFun = LogLvl -> Text -> IO ()
 
-newLogCb :: LogFun -> LogLvl -> IO (Cb F.LogFun)
-newLogCb f lvl = F.newLogCb $ \_ s l _ -> do
+newLogCb :: LogFun -> LogLvl -> IO (Cb LMF.LogFun)
+newLogCb f lvl = LMF.newLogCb $ \_ s l _ -> do
   msg <- liftIO (TF.fromPtr (coerce s) (fromIntegral l))
   f lvl msg
 
@@ -179,29 +179,29 @@ data ObsAct = ObsActAdd | ObsActRem
 
 type ObsFun p = ObsAct -> Ptr p -> IO ()
 
-type ObsInFun = ObsFun F.InPort
+type ObsInFun = ObsFun LMF.InPort
 
-type ObsOutFun = ObsFun F.OutPort
+type ObsOutFun = ObsFun LMF.OutPort
 
-newObsCb :: ObsFun p -> ObsAct -> IO (Cb (F.ObsFun p))
-newObsCb f = F.newObsCb . const . f
+newObsCb :: ObsFun p -> ObsAct -> IO (Cb (LMF.ObsFun p))
+newObsCb f = LMF.newObsCb . const . f
 
 type EnumFun p = Ptr p -> IO ()
 
-type EnumInFun = EnumFun F.InPort
+type EnumInFun = EnumFun LMF.InPort
 
-type EnumOutFun = EnumFun F.OutPort
+type EnumOutFun = EnumFun LMF.OutPort
 
-newEnumCb :: EnumFun p -> IO (Cb (F.ObsFun p))
-newEnumCb = F.newObsCb . const
+newEnumCb :: EnumFun p -> IO (Cb (LMF.ObsFun p))
+newEnumCb = LMF.newObsCb . const
 
 data ObsConfig = ObsConfig
-  { ocOnErr :: !(Maybe (Cb F.LogFun))
-  , ocOnWarn :: !(Maybe (Cb F.LogFun))
-  , ocInAdd :: !(Maybe (Cb (F.ObsFun F.InPort)))
-  , ocInRem :: !(Maybe (Cb (F.ObsFun F.InPort)))
-  , ocOutAdd :: !(Maybe (Cb (F.ObsFun F.OutPort)))
-  , ocOutRem :: !(Maybe (Cb (F.ObsFun F.OutPort)))
+  { ocOnErr :: !(Maybe (Cb LMF.LogFun))
+  , ocOnWarn :: !(Maybe (Cb LMF.LogFun))
+  , ocInAdd :: !(Maybe (Cb (LMF.ObsFun LMF.InPort)))
+  , ocInRem :: !(Maybe (Cb (LMF.ObsFun LMF.InPort)))
+  , ocOutAdd :: !(Maybe (Cb (LMF.ObsFun LMF.OutPort)))
+  , ocOutRem :: !(Maybe (Cb (LMF.ObsFun LMF.OutPort)))
   , ocTrackHardware :: !Bool
   , ocTrackVirtual :: !Bool
   , ocTrackAny :: !Bool
@@ -254,37 +254,37 @@ setObsOutCb f oc = do
       , ocOutRem = Just onRem
       }
 
-mkObsConfig :: ObsConfig -> IO (ForeignPtr F.ObsConfig)
+mkObsConfig :: ObsConfig -> IO (ForeignPtr LMF.ObsConfig)
 mkObsConfig oc = do
-  f <- mallocPtr (Proxy @F.ObsConfig)
+  f <- mallocPtr (Proxy @LMF.ObsConfig)
   withForeignPtr f $ \p -> do
     let
-      setFun :: forall x. Field F.ObsConfig (FunPtr x) -> Cb x -> IO ()
+      setFun :: forall x. Field LMF.ObsConfig (FunPtr x) -> Cb x -> IO ()
       setFun field cb = do
         q <- consumeCb cb
         let w = castPtrToFunPtr (unsafeForeignPtrToPtr q)
         pokeField field p w
         FC.addForeignPtrFinalizer f (finalizeForeignPtr q)
-    traverse_ (setFun F.ocOnErr) (ocOnErr oc)
-    traverse_ (setFun F.ocOnWarn) (ocOnWarn oc)
-    traverse_ (setFun F.ocInAdd) (ocInAdd oc)
-    traverse_ (setFun F.ocInRem) (ocInRem oc)
-    traverse_ (setFun F.ocOutAdd) (ocOutAdd oc)
-    traverse_ (setFun F.ocOutRem) (ocOutRem oc)
-    pokeField F.ocTrackHardware p (toCBool (ocTrackHardware oc))
-    pokeField F.ocTrackVirtual p (toCBool (ocTrackVirtual oc))
-    pokeField F.ocTrackAny p (toCBool (ocTrackAny oc))
-    pokeField F.ocNotifInCon p (toCBool (ocNotifInCon oc))
+    traverse_ (setFun LMF.ocOnErr) (ocOnErr oc)
+    traverse_ (setFun LMF.ocOnWarn) (ocOnWarn oc)
+    traverse_ (setFun LMF.ocInAdd) (ocInAdd oc)
+    traverse_ (setFun LMF.ocInRem) (ocInRem oc)
+    traverse_ (setFun LMF.ocOutAdd) (ocOutAdd oc)
+    traverse_ (setFun LMF.ocOutRem) (ocOutRem oc)
+    pokeField LMF.ocTrackHardware p (toCBool (ocTrackHardware oc))
+    pokeField LMF.ocTrackVirtual p (toCBool (ocTrackVirtual oc))
+    pokeField LMF.ocTrackAny p (toCBool (ocTrackAny oc))
+    pokeField LMF.ocNotifInCon p (toCBool (ocNotifInCon oc))
   pure f
 
 data MidiPort
-  = MidiPortIn !(UniquePtr F.InPort)
-  | MidiPortOut !(UniquePtr F.OutPort)
+  = MidiPortIn !(UniquePtr LMF.InPort)
+  | MidiPortOut !(UniquePtr LMF.OutPort)
   deriving stock (Eq)
 
 data MsgFun
-  = MsgFun1 (Cb (F.MsgFun F.Sym1))
-  | MsgFun2 (Cb (F.MsgFun F.Sym2))
+  = MsgFun1 (Cb (LMF.MsgFun LMF.Sym1))
+  | MsgFun2 (Cb (LMF.MsgFun LMF.Sym2))
   deriving stock (Eq)
 
 msgFunVersion :: MsgFun -> Version
@@ -296,9 +296,9 @@ data MidiConfig = MidiConfig
   { mcVersion :: !(Maybe Version)
   , mcPort :: !(Maybe MidiPort)
   , mcOnMsg :: !(Maybe MsgFun)
-  , mcGetTime :: !(Maybe (Cb F.TimeFun))
-  , mcOnErr :: !(Maybe (Cb F.LogFun))
-  , mcOnWarn :: !(Maybe (Cb F.LogFun))
+  , mcGetTime :: !(Maybe (Cb LMF.TimeFun))
+  , mcOnErr :: !(Maybe (Cb LMF.LogFun))
+  , mcOnWarn :: !(Maybe (Cb LMF.LogFun))
   , mcPortName :: !(Maybe Text)
   , mcVirtualPort :: !Bool
   , mcIgnoreSysex :: !Bool
@@ -325,41 +325,41 @@ instance Default MidiConfig where
       , mcTimestamps = TimestampModeAbsolute
       }
 
-mkMidiConfig :: MidiConfig -> IO (ForeignPtr F.MidiConfig)
+mkMidiConfig :: MidiConfig -> IO (ForeignPtr LMF.MidiConfig)
 mkMidiConfig mc = do
   let ver = fromMaybe (maybe VersionMidi1 msgFunVersion (mcOnMsg mc)) (mcVersion mc)
-  f <- mallocPtr (Proxy @F.MidiConfig)
+  f <- mallocPtr (Proxy @LMF.MidiConfig)
   withForeignPtr f $ \p -> do
     let
-      setFun :: forall x. Field F.MidiConfig (FunPtr x) -> Cb x -> IO ()
+      setFun :: forall x. Field LMF.MidiConfig (FunPtr x) -> Cb x -> IO ()
       setFun field cb = do
         q <- consumeCb cb
         let w = castPtrToFunPtr (unsafeForeignPtrToPtr q)
         pokeField field p w
         FC.addForeignPtrFinalizer f (finalizeForeignPtr q)
-      setPtr :: forall x. Field F.MidiConfig (Ptr x) -> UniquePtr x -> IO ()
+      setPtr :: forall x. Field LMF.MidiConfig (Ptr x) -> UniquePtr x -> IO ()
       setPtr field u = do
         q <- consumeUniquePtr u
         let w = unsafeForeignPtrToPtr q
         pokeField field p w
         FC.addForeignPtrFinalizer f (finalizeForeignPtr q)
     case mcPort mc of
-      Just (MidiPortIn ip) -> setPtr F.mcInPort ip
-      Just (MidiPortOut op) -> setPtr F.mcOutPort op
+      Just (MidiPortIn ip) -> setPtr LMF.mcInPort ip
+      Just (MidiPortOut op) -> setPtr LMF.mcOutPort op
       Nothing -> pure ()
     case mcOnMsg mc of
-      Just (MsgFun1 cb1) -> setFun F.mcOnMsg1 cb1
-      Just (MsgFun2 cb2) -> setFun F.mcOnMsg2 cb2
+      Just (MsgFun1 cb1) -> setFun LMF.mcOnMsg1 cb1
+      Just (MsgFun2 cb2) -> setFun LMF.mcOnMsg2 cb2
       Nothing -> pure ()
-    traverse_ (setFun F.mcGetTime) (mcGetTime mc)
-    traverse_ (setFun F.mcOnErr) (mcOnErr mc)
-    traverse_ (setFun F.mcOnWarn) (mcOnWarn mc)
-    pokeField F.mcVersion p (toBitEnum ver)
-    pokeField F.mcVirtualPort p (toCBool (mcVirtualPort mc))
-    pokeField F.mcIgnoreSysex p (toCBool (mcIgnoreSysex mc))
-    pokeField F.mcIgnoreTiming p (toCBool (mcIgnoreTiming mc))
-    pokeField F.mcIgnoreSensing p (toCBool (mcIgnoreSensing mc))
-    pokeField F.mcTimestamps p (toBitEnum (mcTimestamps mc))
+    traverse_ (setFun LMF.mcGetTime) (mcGetTime mc)
+    traverse_ (setFun LMF.mcOnErr) (mcOnErr mc)
+    traverse_ (setFun LMF.mcOnWarn) (mcOnWarn mc)
+    pokeField LMF.mcVersion p (toBitEnum ver)
+    pokeField LMF.mcVirtualPort p (toCBool (mcVirtualPort mc))
+    pokeField LMF.mcIgnoreSysex p (toCBool (mcIgnoreSysex mc))
+    pokeField LMF.mcIgnoreTiming p (toCBool (mcIgnoreTiming mc))
+    pokeField LMF.mcIgnoreSensing p (toCBool (mcIgnoreSensing mc))
+    pokeField LMF.mcTimestamps p (toBitEnum (mcTimestamps mc))
   pure f
 
 data ApiConfig = ApiConfig
@@ -375,15 +375,15 @@ instance Default ApiConfig where
       , acConfigType = ConfigTypeObserver
       }
 
-mkApiConfig :: ApiConfig -> IO (ForeignPtr F.ApiConfig)
+mkApiConfig :: ApiConfig -> IO (ForeignPtr LMF.ApiConfig)
 mkApiConfig ac = do
-  f <- mallocPtr (Proxy @F.ApiConfig)
+  f <- mallocPtr (Proxy @LMF.ApiConfig)
   withForeignPtr f $ \p -> do
-    pokeField F.acApi p (toBitEnum (acApi ac))
-    pokeField F.acConfigType p (toBitEnum (acConfigType ac))
+    pokeField LMF.acApi p (toBitEnum (acApi ac))
+    pokeField LMF.acConfigType p (toBitEnum (acConfigType ac))
   pure f
 
-type ObsHandle = ForeignPtr F.ObsHandle
+type ObsHandle = ForeignPtr LMF.ObsHandle
 
 newObsHandle :: Api -> ObsConfig -> ErrM ObsHandle
 newObsHandle api oc = do
@@ -391,23 +391,23 @@ newObsHandle api oc = do
   foc <- liftIO (mkObsConfig oc)
   let pac = unsafeForeignPtrToPtr fac
       poc = unsafeForeignPtrToPtr foc
-  takeM (F.libremidi_midi_observer_new poc pac)
+  takeM (LMF.libremidi_midi_observer_new poc pac)
 
 enumInPorts :: ObsHandle -> EnumInFun -> ErrM ()
 enumInPorts h f = unRunErrM $ do
   cb <- newEnumCb f
   withForeignPtr h $ \p ->
     withCb cb $ \fun ->
-      checkM (F.libremidi_midi_observer_enumerate_input_ports p nullPtr fun)
+      checkM (LMF.libremidi_midi_observer_enumerate_input_ports p nullPtr fun)
 
 enumOutPorts :: ObsHandle -> EnumOutFun -> ErrM ()
 enumOutPorts h f = unRunErrM $ do
   cb <- newEnumCb f
   withForeignPtr h $ \p ->
     withCb cb $ \fun ->
-      checkM (F.libremidi_midi_observer_enumerate_output_ports p nullPtr fun)
+      checkM (LMF.libremidi_midi_observer_enumerate_output_ports p nullPtr fun)
 
-type InHandle = ForeignPtr F.InHandle
+type InHandle = ForeignPtr LMF.InHandle
 
 newInHandle :: Api -> MidiConfig -> ErrM InHandle
 newInHandle api mc = do
@@ -415,15 +415,15 @@ newInHandle api mc = do
   fmc <- liftIO (mkMidiConfig mc)
   let pac = unsafeForeignPtrToPtr fac
       pmc = unsafeForeignPtrToPtr fmc
-  takeM (F.libremidi_midi_in_new pmc pac)
+  takeM (LMF.libremidi_midi_in_new pmc pac)
 
 inIsConnected :: InHandle -> IO Bool
-inIsConnected fih = withForeignPtr fih (fmap fromCBool . F.libremidi_midi_in_is_connected)
+inIsConnected fih = withForeignPtr fih (fmap fromCBool . LMF.libremidi_midi_in_is_connected)
 
 inAbsTimestamp :: InHandle -> IO Timestamp
-inAbsTimestamp fih = withForeignPtr fih (fmap fromCLong . F.libremidi_midi_in_absolute_timestamp)
+inAbsTimestamp fih = withForeignPtr fih (fmap fromCLong . LMF.libremidi_midi_in_absolute_timestamp)
 
-type OutHandle = ForeignPtr F.OutHandle
+type OutHandle = ForeignPtr LMF.OutHandle
 
 newOutHandle :: Api -> MidiConfig -> ErrM OutHandle
 newOutHandle api mc = do
@@ -431,27 +431,31 @@ newOutHandle api mc = do
   fmc <- liftIO (mkMidiConfig mc)
   let pac = unsafeForeignPtrToPtr fac
       pmc = unsafeForeignPtrToPtr fmc
-  takeM (F.libremidi_midi_out_new pmc pac)
+  takeM (LMF.libremidi_midi_out_new pmc pac)
 
 outIsConnected :: OutHandle -> IO Bool
-outIsConnected foh = withForeignPtr foh (fmap fromCBool . F.libremidi_midi_out_is_connected)
+outIsConnected foh = withForeignPtr foh (fmap fromCBool . LMF.libremidi_midi_out_is_connected)
 
-outSendMsg1 :: OutHandle -> Ptr F.Sym1 -> Int -> ErrM ()
-outSendMsg1 h dat len = unRunErrM $
-  withForeignPtr h $ \p ->
-    checkM (F.libremidi_midi_out_send_message p dat (toCSize (fromIntegral len)))
+type Msg1 = Ptr LMF.Sym1
 
-outSchedMsg1 :: OutHandle -> Timestamp -> Ptr F.Sym1 -> Int -> ErrM ()
-outSchedMsg1 h ts dat len = unRunErrM $
+outSendMsg1 :: OutHandle -> Msg1 -> Int -> ErrM ()
+outSendMsg1 h msg len = unRunErrM $
   withForeignPtr h $ \p ->
-    checkM (F.libremidi_midi_out_schedule_message p (toCLong ts) dat (toCSize (fromIntegral len)))
+    checkM (LMF.libremidi_midi_out_send_message p msg (toCSize (fromIntegral len)))
 
-outSendMsg2 :: OutHandle -> Ptr F.Sym2 -> Int -> ErrM ()
-outSendMsg2 h dat len = unRunErrM $
+outSchedMsg1 :: OutHandle -> Timestamp -> Msg1 -> Int -> ErrM ()
+outSchedMsg1 h ts msg len = unRunErrM $
   withForeignPtr h $ \p ->
-    checkM (F.libremidi_midi_out_send_ump p dat (toCSize (fromIntegral len)))
+    checkM (LMF.libremidi_midi_out_schedule_message p (toCLong ts) msg (toCSize (fromIntegral len)))
 
-outSchedMsg2 :: OutHandle -> Timestamp -> Ptr F.Sym2 -> Int -> ErrM ()
-outSchedMsg2 h ts dat len = unRunErrM $
+type Msg2 = Ptr LMF.Sym2
+
+outSendMsg2 :: OutHandle -> Msg2 -> Int -> ErrM ()
+outSendMsg2 h msg len = unRunErrM $
   withForeignPtr h $ \p ->
-    checkM (F.libremidi_midi_out_schedule_ump p (toCLong ts) dat (toCSize (fromIntegral len)))
+    checkM (LMF.libremidi_midi_out_send_ump p msg (toCSize (fromIntegral len)))
+
+outSchedMsg2 :: OutHandle -> Timestamp -> Msg2 -> Int -> ErrM ()
+outSchedMsg2 h ts msg len = unRunErrM $
+  withForeignPtr h $ \p ->
+    checkM (LMF.libremidi_midi_out_schedule_ump p (toCLong ts) msg (toCSize (fromIntegral len)))
