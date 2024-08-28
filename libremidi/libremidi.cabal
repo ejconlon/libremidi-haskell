@@ -81,7 +81,6 @@ library
       base >=4.12 && <5
     , containers >=0.6.7 && <0.7
     , data-default >=0.7.1.1 && <0.8
-    , free ==5.2.*
     , mtl >=2.3.1 && <2.4
     , stm >=2.5.1.0 && <2.6
     , text >=2.0.2 && <2.1
@@ -140,7 +139,6 @@ executable libremidi-exe
       base >=4.12 && <5
     , containers >=0.6.7 && <0.7
     , data-default >=0.7.1.1 && <0.8
-    , free ==5.2.*
     , libremidi
     , mtl >=2.3.1 && <2.4
     , stm >=2.5.1.0 && <2.6
@@ -191,7 +189,6 @@ test-suite libremidi-test
       base >=4.12 && <5
     , containers >=0.6.7 && <0.7
     , data-default >=0.7.1.1 && <0.8
-    , free ==5.2.*
     , libremidi
     , mtl >=2.3.1 && <2.4
     , stm >=2.5.1.0 && <2.6
