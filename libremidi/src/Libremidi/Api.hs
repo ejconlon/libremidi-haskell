@@ -151,6 +151,9 @@ type Timestamp = Int64
 
 type InPort = ForeignPtr LMF.InPort
 
+freeInPort :: InPort -> IO ()
+freeInPort = finalizeForeignPtr
+
 cloneInPort' :: Ptr LMF.InPort -> ErrM InPort
 cloneInPort' = takeM . LMF.libremidi_midi_in_port_clone
 
@@ -164,6 +167,9 @@ inPortName :: InPort -> ErrM Text
 inPortName = assocM inPortName'
 
 type OutPort = ForeignPtr LMF.OutPort
+
+freeOutPort :: OutPort -> IO ()
+freeOutPort = finalizeForeignPtr
 
 cloneOutPort' :: Ptr LMF.OutPort -> ErrM OutPort
 cloneOutPort' = takeM . LMF.libremidi_midi_out_port_clone
@@ -406,6 +412,9 @@ newObsHandle api oc = do
       poc = unsafeForeignPtrToPtr foc
   takeM (LMF.libremidi_midi_observer_new poc pac)
 
+freeObsHandle :: ObsHandle -> IO ()
+freeObsHandle = finalizeForeignPtr
+
 enumInPorts :: ObsHandle -> EnumInFun -> ErrM ()
 enumInPorts h f = unRunErrM $ do
   cb <- newEnumCb f
@@ -430,6 +439,9 @@ newInHandle api mc = do
       pmc = unsafeForeignPtrToPtr fmc
   takeM (LMF.libremidi_midi_in_new pmc pac)
 
+freeInHandle :: InHandle -> IO ()
+freeInHandle = finalizeForeignPtr
+
 inIsConnected :: InHandle -> IO Bool
 inIsConnected fih = withForeignPtr fih (fmap fromCBool . LMF.libremidi_midi_in_is_connected)
 
@@ -445,6 +457,9 @@ newOutHandle api mc = do
   let pac = unsafeForeignPtrToPtr fac
       pmc = unsafeForeignPtrToPtr fmc
   takeM (LMF.libremidi_midi_out_new pmc pac)
+
+freeOutHandle :: OutHandle -> IO ()
+freeOutHandle = finalizeForeignPtr
 
 outIsConnected :: OutHandle -> IO Bool
 outIsConnected foh = withForeignPtr foh (fmap fromCBool . LMF.libremidi_midi_out_is_connected)
