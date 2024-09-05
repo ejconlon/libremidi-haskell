@@ -99,8 +99,8 @@ freeUniquePtr (UniquePtr v) = mask_ $ do
       RefFree -> pure Nothing
   traverse_ finalizeForeignPtr mfp
 
-withUniquePtr :: UniquePtr p -> (Ptr p -> IO a) -> IO a
-withUniquePtr (UniquePtr v) f = mask $ \restore -> do
+withUniquePtr' :: UniquePtr p -> (ForeignPtr p -> IO a) -> IO a
+withUniquePtr' (UniquePtr v) f = mask $ \restore -> do
   fp <- atomically $ do
     r <- readTVar v
     case r of
@@ -110,8 +110,11 @@ withUniquePtr (UniquePtr v) f = mask $ \restore -> do
       RefLock -> retry
       RefFree -> throwSTM FreeErr
   finally
-    (restore (withForeignPtr fp f))
+    (restore (f fp))
     (atomically (writeTVar v (RefUnlock fp)))
+
+withUniquePtr :: UniquePtr p -> (Ptr p -> IO a) -> IO a
+withUniquePtr u f = withUniquePtr' u (`withForeignPtr` f)
 
 consumeUniquePtr :: UniquePtr p -> IO (ForeignPtr p)
 consumeUniquePtr (UniquePtr v) = atomically $ do
