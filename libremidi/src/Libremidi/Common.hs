@@ -1,7 +1,7 @@
 module Libremidi.Common where
 
 import Control.Concurrent.STM (atomically, retry, throwSTM)
-import Control.Concurrent.STM.TVar (TVar, newTVarIO, readTVar, writeTVar)
+import Control.Concurrent.STM.TVar (TVar, newTVarIO, readTVar, readTVarIO, writeTVar)
 import Control.Exception (Exception, finally, mask, mask_, throwIO)
 import Control.Monad.Except (ExceptT (..), MonadError (..), runExceptT)
 import Control.Monad.IO.Class (MonadIO (..))
@@ -79,6 +79,13 @@ instance Exception FreeErr
 
 newUniquePtr :: ForeignPtr p -> IO (UniquePtr p)
 newUniquePtr = fmap UniquePtr . newTVarIO . RefUnlock
+
+aliveUniquePtr :: UniquePtr p -> IO Bool
+aliveUniquePtr (UniquePtr v) = fmap isAlive (readTVarIO v)
+ where
+  isAlive = \case
+    RefFree -> False
+    _ -> True
 
 freeUniquePtr :: UniquePtr p -> IO ()
 freeUniquePtr (UniquePtr v) = mask_ $ do
