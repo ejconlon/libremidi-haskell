@@ -318,7 +318,6 @@ data MidiConfig = MidiConfig
   , mcGetTime :: !(Maybe (Cb LMF.TimeFun))
   , mcOnErr :: !(Maybe (Cb LMF.LogFun))
   , mcOnWarn :: !(Maybe (Cb LMF.LogFun))
-  , mcPortName :: !(Maybe Text)
   , mcVirtualPort :: !Bool
   , mcIgnoreSysex :: !Bool
   , mcIgnoreTiming :: !Bool
@@ -336,7 +335,6 @@ instance Default MidiConfig where
       , mcGetTime = Nothing
       , mcOnErr = Nothing
       , mcOnWarn = Nothing
-      , mcPortName = Nothing
       , mcVirtualPort = True
       , mcIgnoreSysex = False
       , mcIgnoreTiming = False
