@@ -335,11 +335,21 @@ instance Default MidiConfig where
       , mcGetTime = Nothing
       , mcOnErr = Nothing
       , mcOnWarn = Nothing
-      , mcVirtualPort = True
+      , mcVirtualPort = False
       , mcIgnoreSysex = False
       , mcIgnoreTiming = False
       , mcIgnoreSensing = True
       , mcTimestamps = TimestampModeAbsolute
+      }
+
+setMidiLogCb :: LogFun -> MidiConfig -> IO MidiConfig
+setMidiLogCb f mc = do
+  onErr <- newLogCb f LogLvlErr
+  onWarn <- newLogCb f LogLvlWarn
+  pure $
+    mc
+      { mcOnErr = Just onErr
+      , mcOnWarn = Just onWarn
       }
 
 mkMidiConfig :: MidiConfig -> IO (ForeignPtr LMF.MidiConfig)
@@ -408,7 +418,11 @@ newObsHandle api oc = do
   foc <- liftIO (mkObsConfig oc)
   let pac = unsafeForeignPtrToPtr fac
       poc = unsafeForeignPtrToPtr foc
-  takeM (LMF.libremidi_midi_observer_new poc pac)
+  fh <- takeM (LMF.libremidi_midi_observer_new poc pac)
+  liftIO $ do
+    FC.addForeignPtrFinalizer fh (finalizeForeignPtr fac)
+    FC.addForeignPtrFinalizer fh (finalizeForeignPtr foc)
+  pure fh
 
 freeObsHandle :: ObsHandle -> IO ()
 freeObsHandle = finalizeForeignPtr
@@ -435,7 +449,11 @@ newInHandle api mc = do
   fmc <- liftIO (mkMidiConfig mc)
   let pac = unsafeForeignPtrToPtr fac
       pmc = unsafeForeignPtrToPtr fmc
-  takeM (LMF.libremidi_midi_in_new pmc pac)
+  fh <- takeM (LMF.libremidi_midi_in_new pmc pac)
+  liftIO $ do
+    FC.addForeignPtrFinalizer fh (finalizeForeignPtr fac)
+    FC.addForeignPtrFinalizer fh (finalizeForeignPtr fmc)
+  pure fh
 
 freeInHandle :: InHandle -> IO ()
 freeInHandle = finalizeForeignPtr
@@ -454,7 +472,11 @@ newOutHandle api mc = do
   fmc <- liftIO (mkMidiConfig mc)
   let pac = unsafeForeignPtrToPtr fac
       pmc = unsafeForeignPtrToPtr fmc
-  takeM (LMF.libremidi_midi_out_new pmc pac)
+  fh <- takeM (LMF.libremidi_midi_out_new pmc pac)
+  liftIO $ do
+    FC.addForeignPtrFinalizer fh (finalizeForeignPtr fac)
+    FC.addForeignPtrFinalizer fh (finalizeForeignPtr fmc)
+  pure fh
 
 freeOutHandle :: OutHandle -> IO ()
 freeOutHandle = finalizeForeignPtr

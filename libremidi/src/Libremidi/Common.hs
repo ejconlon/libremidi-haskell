@@ -16,8 +16,8 @@ import Data.Word (Word64)
 import Foreign.C.String (CString)
 import Foreign.C.Types (CBool (..), CInt (..), CLong (..), CSize (..))
 import Foreign.Concurrent qualified as FC
-import Foreign.ForeignPtr (ForeignPtr, finalizeForeignPtr, mallocForeignPtrBytes, newForeignPtr, withForeignPtr)
-import Foreign.Marshal.Alloc (alloca, finalizerFree)
+import Foreign.ForeignPtr (ForeignPtr, finalizeForeignPtr, mallocForeignPtrBytes, withForeignPtr)
+import Foreign.Marshal.Alloc (alloca, free)
 import Foreign.Marshal.Utils (fillBytes)
 import Foreign.Ptr (FunPtr, Ptr, castFunPtrToPtr, castPtrToFunPtr, freeHaskellFunPtr, nullPtr, plusPtr)
 import Foreign.Storable (Storable (..))
@@ -204,9 +204,8 @@ takeM f = unRunErrM $
   allocaPtr $ \pptr -> do
     checkAndThenM (f pptr) $ do
       ptr <- peek pptr
-      fp <- newForeignPtr finalizerFree ptr
-      poke pptr nullPtr
-      pure fp
+      -- Cannot use finalizerFree because may have other haskell finalizers
+      FC.newForeignPtr ptr (free ptr)
 
 toCBool :: Bool -> CBool
 toCBool = \case
