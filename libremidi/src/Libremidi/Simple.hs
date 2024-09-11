@@ -5,6 +5,7 @@ module Libremidi.Simple where
 
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Reader (ReaderT (..), ask)
 import Data.Default (def)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef, writeIORef)
 import Data.Maybe (isNothing)
@@ -17,6 +18,11 @@ import Libremidi.Api qualified as LMA
 import Libremidi.Common (ErrM, newUniquePtr, rethrowErrM)
 import System.IO qualified as SIO
 
+type MidiM = ReaderT LMA.LogFun IO
+
+runMidiM :: MidiM a -> LMA.LogFun -> IO a
+runMidiM = runReaderT
+
 nullLogFun :: LMA.LogFun
 nullLogFun _ _ = pure ()
 
@@ -27,10 +33,12 @@ stderrLogFun lvl msg =
         LMA.LogLvlErr -> "[ERR ] "
   in  TIO.hPutStrLn SIO.stderr (prefix <> msg)
 
-newObsHandle :: LMA.LogFun -> IO LMA.ObsHandle
-newObsHandle lf = do
-  oc <- LMA.setObsLogCb lf def
-  rethrowErrM (LMA.newObsHandle LMA.ApiUnspecified oc)
+newObsHandle :: MidiM LMA.ObsHandle
+newObsHandle = do
+  lf <- ask
+  liftIO $ do
+    oc <- LMA.setObsLogCb lf def
+    rethrowErrM (LMA.newObsHandle LMA.ApiUnspecified oc)
 
 listEnumFun
   :: (Ptr p -> ErrM Text)
@@ -46,19 +54,19 @@ listPorts
   :: (Ptr p -> ErrM Text)
   -> (Ptr p -> ErrM (ForeignPtr p))
   -> (LMA.ObsHandle -> LMA.EnumFun p -> ErrM ())
-  -> LMA.LogFun
-  -> IO (Seq (Text, ForeignPtr p))
-listPorts name clone list lf = do
-  r <- newIORef Empty
+  -> MidiM (Seq (Text, ForeignPtr p))
+listPorts name clone list = do
+  r <- liftIO (newIORef Empty)
   let f = listEnumFun name clone r
-  foh <- newObsHandle lf
-  rethrowErrM (list foh f)
-  readIORef r
+  foh <- newObsHandle
+  liftIO $ do
+    rethrowErrM (list foh f)
+    readIORef r
 
-listInPorts :: LMA.LogFun -> IO (Seq (Text, LMA.InPort))
+listInPorts :: MidiM (Seq (Text, LMA.InPort))
 listInPorts = listPorts LMA.inPortName' LMA.cloneInPort' LMA.enumInPorts
 
-listOutPorts :: LMA.LogFun -> IO (Seq (Text, LMA.OutPort))
+listOutPorts :: MidiM (Seq (Text, LMA.OutPort))
 listOutPorts = listPorts LMA.outPortName' LMA.cloneOutPort' LMA.enumOutPorts
 
 findEnumFun
@@ -79,25 +87,27 @@ findPort
   :: (Ptr p -> ErrM Text)
   -> (Ptr p -> ErrM (ForeignPtr p))
   -> (LMA.ObsHandle -> LMA.EnumFun p -> ErrM ())
-  -> LMA.LogFun
   -> (Text -> Bool)
-  -> IO (Maybe (Text, ForeignPtr p))
-findPort name clone list lf sel = do
-  r <- newIORef Nothing
+  -> MidiM (Maybe (Text, ForeignPtr p))
+findPort name clone list sel = do
+  r <- liftIO (newIORef Nothing)
   let f = findEnumFun name clone sel r
-  foh <- newObsHandle lf
-  rethrowErrM (list foh f)
-  readIORef r
+  foh <- newObsHandle
+  liftIO $ do
+    rethrowErrM (list foh f)
+    readIORef r
 
-findInPort :: LMA.LogFun -> (Text -> Bool) -> IO (Maybe (Text, LMA.InPort))
+findInPort :: (Text -> Bool) -> MidiM (Maybe (Text, LMA.InPort))
 findInPort = findPort LMA.inPortName' LMA.cloneInPort' LMA.enumInPorts
 
-findOutPort :: LMA.LogFun -> (Text -> Bool) -> IO (Maybe (Text, LMA.OutPort))
+findOutPort :: (Text -> Bool) -> MidiM (Maybe (Text, LMA.OutPort))
 findOutPort = findPort LMA.outPortName' LMA.cloneOutPort' LMA.enumOutPorts
 
-openOutPort :: LMA.LogFun -> LMA.OutPort -> IO LMA.OutHandle
-openOutPort lf op = rethrowErrM $ do
-  op' <- LMA.cloneOutPort op >>= liftIO . newUniquePtr
-  let mc = def {LMA.mcPort = Just (LMA.MidiPortOut op')}
-  mc' <- liftIO (LMA.setMidiLogCb lf mc)
-  LMA.newOutHandle LMA.ApiUnspecified mc'
+openOutPort :: LMA.OutPort -> MidiM LMA.OutHandle
+openOutPort op = do
+  lf <- ask
+  liftIO $ rethrowErrM $ do
+    op' <- LMA.cloneOutPort op >>= liftIO . newUniquePtr
+    let mc = def {LMA.mcPort = Just (LMA.MidiPortOut op')}
+    mc' <- liftIO (LMA.setMidiLogCb lf mc)
+    LMA.newOutHandle LMA.ApiUnspecified mc'
