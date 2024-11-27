@@ -1,0 +1,12 @@
+diff --git a/libremidi/vendor/libremidi/message.hpp b/libremidi/vendor/libremidi/message.hpp
+index 199cfe4..c24458f 100644
+--- a/libremidi/vendor/libremidi/message.hpp
++++ b/libremidi/vendor/libremidi/message.hpp
+@@ -2,6 +2,7 @@
+ #include <libremidi/config.hpp>
+ 
+ #include <algorithm>
++#include <cstdint>
+ #include <span>
+ #include <vector>
+ #if defined(__cpp_exceptions)

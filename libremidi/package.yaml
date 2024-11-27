@@ -39,9 +39,10 @@ library:
     #   -- Cribbed from https://github.com/fpco/inline-c/pull/89
     #   -- avoid https://gitlab.haskell.org/ghc/ghc/issues/11829
     ld-options: -Wl,-keep_dwarf_unwind
-    ghc-options: -pgmc=clang++
+    ghc-options: -pgmcxx=clang++
   - condition: os(linux)
     cxx-options: -std=c++20 -DLIBREMIDI_PIPEWIRE=1
+    ghc-options: -pgmcxx=clang++
     pkgconfig-depends: libpipewire-0.3
 
 executables:
