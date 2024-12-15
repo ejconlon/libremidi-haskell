@@ -8,7 +8,7 @@ maintainer: ejconlon@gmail.com
 copyright: (c) 2024 Eric Conlon
 synopsis: libremidi bindings for haskell
 description: Please see the README on GitHub at <https://github.com/ejconlon/libremidi-haskell#readme>
-tested-with: GHC == 9.6.6
+tested-with: GHC == 9.8.4
 
 defaults:
   local: ../defaults.yaml
@@ -19,7 +19,7 @@ dependencies:
 - containers >= 0.6.7 && < 0.7
 - mtl >= 2.3.1 && < 2.4
 - stm >= 2.5.1.0 && < 2.6
-- text >= 2.0.2 && < 2.1
+- text >= 2.0.2 && < 2.2
 - transformers >= 0.6.1 && < 0.7
 
 library:
