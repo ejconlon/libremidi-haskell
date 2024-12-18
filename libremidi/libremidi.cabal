@@ -5,7 +5,7 @@ cabal-version: 2.2
 -- see: https://github.com/sol/hpack
 
 name:           libremidi
-version:        0.1.0
+version:        0.3.0
 synopsis:       libremidi bindings for haskell
 description:    Please see the README on GitHub at <https://github.com/ejconlon/libremidi-haskell#readme>
 homepage:       https://github.com/ejconlon/libremidi-haskell#readme
@@ -66,6 +66,9 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds
   include-dirs:
       vendor
+  install-includes:
+      vendor/libremidi/api-c.h
+      vendor/libremidi/libremidi-c.h
   cxx-sources:
       vendor/libremidi/client.cpp
       vendor/libremidi/libremidi-c.cpp
@@ -137,6 +140,9 @@ executable libremidi-exe
       TypeOperators
       TypeFamilies
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -threaded -rtsopts -with-rtsopts=-N
+  install-includes:
+      vendor/libremidi/api-c.h
+      vendor/libremidi/libremidi-c.h
   build-depends:
       base >=4.12 && <5
     , containers >=0.6.7 && <0.7
@@ -187,6 +193,9 @@ test-suite libremidi-test
       TypeOperators
       TypeFamilies
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints -fno-warn-unused-top-binds -threaded -rtsopts -with-rtsopts=-N
+  install-includes:
+      vendor/libremidi/api-c.h
+      vendor/libremidi/libremidi-c.h
   build-depends:
       base >=4.12 && <5
     , containers >=0.6.7 && <0.7
