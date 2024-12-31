@@ -5,7 +5,7 @@ cabal-version: 2.2
 -- see: https://github.com/sol/hpack
 
 name:           libremidi
-version:        0.4.0
+version:        0.4.1
 synopsis:       libremidi bindings for haskell
 description:    Please see the README on GitHub at <https://github.com/ejconlon/libremidi-haskell#readme>
 homepage:       https://github.com/ejconlon/libremidi-haskell#readme
@@ -215,13 +215,10 @@ library
     , transformers >=0.6.1 && <0.7
   default-language: GHC2021
   if os(darwin)
-    ghc-options: -pgmcxx=clang++
     cxx-options: -std=c++20 -DLIBREMIDI_COREMIDI=1
     frameworks:
         CoreMIDI CoreAudio CoreFoundation
-    ld-options: -Wl,-keep_dwarf_unwind
   if os(linux)
-    ghc-options: -pgmcxx=clang++
     cxx-options: -std=c++20 -DLIBREMIDI_PIPEWIRE=1 -DLIBREMIDI_HAS_UDEV=1
     pkgconfig-depends:
         libpipewire-0.3
