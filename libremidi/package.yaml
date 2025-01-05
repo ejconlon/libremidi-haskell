@@ -1,5 +1,5 @@
 name: libremidi
-version: 0.4.1
+version: 0.4.2
 
 github: ejconlon/libremidi-haskell
 license: BSD3

@@ -5,7 +5,7 @@ cabal-version: 2.2
 -- see: https://github.com/sol/hpack
 
 name:           libremidi
-version:        0.4.1
+version:        0.4.2
 synopsis:       libremidi bindings for haskell
 description:    Please see the README on GitHub at <https://github.com/ejconlon/libremidi-haskell#readme>
 homepage:       https://github.com/ejconlon/libremidi-haskell#readme
