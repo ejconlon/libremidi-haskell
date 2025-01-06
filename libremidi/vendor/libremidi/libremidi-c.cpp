@@ -72,7 +72,7 @@ libremidi_api libremidi_get_compiled_api_by_identifier(const char* name)
 {
   libremidi_api ret = libremidi_api::UNSPECIFIED;
   libremidi::midi_any::for_all_backends([&](auto& b) {
-    if (name == b.name)
+    if (strcmp(b.name, name) == 0)
       ret = b.API;
   });
   return ret;

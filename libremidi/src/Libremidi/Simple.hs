@@ -111,3 +111,18 @@ openOutPort op = do
     let mc = def {LMA.mcPort = Just (LMA.MidiPortOut op')}
     mc' <- liftIO (LMA.setMidiLogCb lf mc)
     LMA.newOutHandle LMA.ApiUnspecified mc'
+
+listAvailFun :: IORef (Seq LMA.Api) -> LMA.AvailFun
+listAvailFun r = maybe (pure ()) (modifyIORef' r . flip (:|>))
+
+listAvailApis1 :: IO (Seq LMA.Api)
+listAvailApis1 = do
+  r <- newIORef Empty
+  LMA.availApis1 (listAvailFun r)
+  readIORef r
+
+listAvailApis2 :: IO (Seq LMA.Api)
+listAvailApis2 = do
+  r <- newIORef Empty
+  LMA.availApis2 (listAvailFun r)
+  readIORef r

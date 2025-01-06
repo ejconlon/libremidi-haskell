@@ -167,9 +167,9 @@ LIBREMIDI_EXPORT
 const char* libremidi_get_version(void);
 
 LIBREMIDI_EXPORT
-void libremidi_midi1_available_apis(void* ctx, void (*)(void*, libremidi_api));
+void libremidi_available_midi1_apis(void* ctx, void (*)(void*, libremidi_api));
 LIBREMIDI_EXPORT
-void libremidi_midi2_available_apis(void* ctx, void (*)(void*, libremidi_api));
+void libremidi_available_midi2_apis(void* ctx, void (*)(void*, libremidi_api));
 LIBREMIDI_EXPORT
 const char* libremidi_api_identifier(libremidi_api);
 LIBREMIDI_EXPORT

@@ -5,7 +5,6 @@ import Control.Concurrent.STM.TVar (TVar, newTVarIO, readTVar, writeTVar)
 import Control.Exception (Exception, finally, mask, mask_, throwIO)
 import Control.Monad.Except (ExceptT (..), MonadError (..), runExceptT)
 import Control.Monad.IO.Class (MonadIO (..))
-import Data.Coerce (coerce)
 import Data.Foldable (traverse_)
 import Data.Int (Int32, Int64)
 import Data.Kind (Type)
@@ -190,6 +189,15 @@ checkAndThenM one two = do
     then fmap Right two
     else pure (Left e)
 
+-- TODO use TF.peekCString when available in text 2.1.2
+foreign import ccall "string.h strlen"
+  strlen :: CString -> IO CSize
+
+text0M :: CString -> IO Text
+text0M s = do
+  l <- strlen s
+  TF.peekCStringLen (s, fromIntegral l)
+
 textM :: (Ptr CString -> Ptr CSize -> IO Err) -> ErrM Text
 textM f = unRunErrM $
   allocaPtr $ \sptr -> do
@@ -197,7 +205,7 @@ textM f = unRunErrM $
       checkAndThenM (f sptr lptr) $ do
         s <- peek sptr
         l <- peek lptr
-        TF.fromPtr (coerce s) (fromIntegral l)
+        TF.peekCStringLen (s, fromIntegral l)
 
 takeM :: (Ptr (Ptr x) -> IO Err) -> ErrM (ForeignPtr x)
 takeM f = unRunErrM $

@@ -3,6 +3,7 @@
 -- Operations in ErrM can possibly fail.
 module Libremidi.Api where
 
+import Control.Monad ((>=>))
 import Control.Monad.IO.Class (liftIO)
 import Data.Coerce (coerce)
 import Data.Default (Default (..))
@@ -31,6 +32,7 @@ import Libremidi.Common
   , fromCLong
   , pokeField
   , takeM
+  , text0M
   , textM
   , toCBool
   , toCLong
@@ -76,10 +78,14 @@ data Api
   | ApiWindowsUwp
   | ApiWebmidi
   | ApiPipewire
+  | ApiKeyboard
+  | ApiNetwork
   | ApiAlsaRawUmp
   | ApiAlsaSeqUmp
   | ApiCoremidiUmp
   | ApiWindowsMidiServices
+  | ApiKeyboardUmp
+  | ApiNetworkUmp
   | ApiDummy
   deriving stock (Eq, Ord, Show, Enum, Bounded)
 
@@ -94,10 +100,14 @@ instance BitEnum LMF.Api Api where
     a | a == LMF.apiWindowsUwp -> Just ApiWindowsUwp
     a | a == LMF.apiWebmidi -> Just ApiWebmidi
     a | a == LMF.apiPipewire -> Just ApiPipewire
+    a | a == LMF.apiKeyboard -> Just ApiKeyboard
+    a | a == LMF.apiNetwork -> Just ApiNetwork
     a | a == LMF.apiAlsaRawUmp -> Just ApiAlsaRawUmp
     a | a == LMF.apiAlsaSeqUmp -> Just ApiAlsaSeqUmp
     a | a == LMF.apiCoremidiUmp -> Just ApiCoremidiUmp
     a | a == LMF.apiWindowsMidiServices -> Just ApiWindowsMidiServices
+    a | a == LMF.apiKeyboardUmp -> Just ApiKeyboardUmp
+    a | a == LMF.apiNetworkUmp -> Just ApiNetworkUmp
     a | a == LMF.apiDummy -> Just ApiDummy
     _ -> Nothing
   toBitEnum = \case
@@ -110,10 +120,14 @@ instance BitEnum LMF.Api Api where
     ApiWindowsUwp -> LMF.apiWindowsUwp
     ApiWebmidi -> LMF.apiWebmidi
     ApiPipewire -> LMF.apiPipewire
+    ApiKeyboard -> LMF.apiKeyboard
+    ApiNetwork -> LMF.apiNetwork
     ApiAlsaRawUmp -> LMF.apiAlsaRawUmp
     ApiAlsaSeqUmp -> LMF.apiAlsaSeqUmp
     ApiCoremidiUmp -> LMF.apiCoremidiUmp
     ApiWindowsMidiServices -> LMF.apiWindowsMidiServices
+    ApiKeyboardUmp -> LMF.apiKeyboardUmp
+    ApiNetworkUmp -> LMF.apiNetworkUmp
     ApiDummy -> LMF.apiDummy
 
 data ConfigType
@@ -507,3 +521,31 @@ outSchedMsg2 :: OutHandle -> Timestamp -> Msg2 -> Int -> ErrM ()
 outSchedMsg2 h ts msg len = unRunErrM $
   withForeignPtr h $ \p ->
     checkM (LMF.libremidi_midi_out_schedule_ump p (toCLong ts) msg (toCSize (fromIntegral len)))
+
+getVersion :: IO Text
+getVersion = LMF.libremidi_get_version >>= text0M
+
+type AvailFun = Maybe Api -> IO ()
+
+newAvailCb :: AvailFun -> IO (Cb LMF.AvailFun)
+newAvailCb f = LMF.newAvailCb (\_ -> f . fromBitEnum)
+
+availApis1 :: AvailFun -> IO ()
+availApis1 f = do
+  cb <- newAvailCb f
+  withCb cb (LMF.libremidi_available_midi1_apis nullPtr)
+
+availApis2 :: AvailFun -> IO ()
+availApis2 f = do
+  cb <- newAvailCb f
+  withCb cb (LMF.libremidi_available_midi2_apis nullPtr)
+
+apiIdentifier :: Api -> IO Text
+apiIdentifier = LMF.libremidi_api_identifier . toBitEnum >=> text0M
+
+apiDisplayName :: Api -> IO Text
+apiDisplayName = LMF.libremidi_api_display_name . toBitEnum >=> text0M
+
+getCompiledApiByIdentifier :: Text -> IO (Maybe Api)
+getCompiledApiByIdentifier n =
+  TF.withCString n (fmap fromBitEnum . LMF.libremidi_get_compiled_api_by_identifier)

@@ -10,6 +10,7 @@ import Data.Void (Void)
 import Foreign.Ptr (Ptr, FunPtr)
 import Libremidi.Common (Err (..), Field, Cb, mallocForeignPtrBytes0, newCb, ptrSize, MallocPtr (..), newField)
 
+#include "libremidi/api-c.h"
 #include "libremidi/libremidi-c.h"
 
 #{enum TimestampMode
@@ -35,10 +36,14 @@ type Api = CInt
  , apiWindowsUwp = WINDOWS_UWP
  , apiWebmidi = WEBMIDI
  , apiPipewire = PIPEWIRE
+ , apiKeyboard = KEYBOARD
+ , apiNetwork = NETWORK
  , apiAlsaRawUmp = ALSA_RAW_UMP
  , apiAlsaSeqUmp = ALSA_SEQ_UMP
  , apiCoremidiUmp = COREMIDI_UMP
  , apiWindowsMidiServices = WINDOWS_MIDI_SERVICES
+ , apiKeyboardUmp = KEYBOARD_UMP
+ , apiNetworkUmp = NETWORK_UMP
  , apiDummy = DUMMY
 }
 
@@ -216,10 +221,10 @@ foreign import ccall "libremidi/libremidi-c.h"
   libremidi_get_version :: IO CString
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_midi1_available_apis :: Ptr Void -> FunPtr AvailFun -> IO ()
+  libremidi_available_midi1_apis :: Ptr Void -> FunPtr AvailFun -> IO ()
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_midi2_available_apis :: Ptr Void -> FunPtr AvailFun -> IO ()
+  libremidi_available_midi2_apis :: Ptr Void -> FunPtr AvailFun -> IO ()
 
 foreign import ccall "libremidi/libremidi-c.h"
   libremidi_api_identifier :: Api -> IO CString
