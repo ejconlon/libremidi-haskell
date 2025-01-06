@@ -75,6 +75,7 @@ type TimestampMode = CInt
 
 data ApiConfig
 
+-- TODO Use libremidi_midi_api_configuration_init
 instance MallocPtr ApiConfig where
   mallocPtr _ = mallocForeignPtrBytes0 #{size libremidi_api_configuration}
 
@@ -103,8 +104,17 @@ foreign import ccall "wrapper"
 newObsCb :: ObsFun p -> IO (Cb (ObsFun p))
 newObsCb = newCb obsWrap
 
+type AvailFun = Ptr Void -> Api -> IO ()
+
+foreign import ccall "wrapper"
+  availWrap :: AvailFun -> IO (FunPtr AvailFun)
+
+newAvailCb :: AvailFun -> IO (Cb AvailFun)
+newAvailCb = newCb availWrap
+
 data ObsConfig
 
+-- TODO Use libremidi_midi_observer_configuration_init
 instance MallocPtr ObsConfig where
   mallocPtr _ = mallocForeignPtrBytes0 #{size libremidi_observer_configuration}
 
@@ -156,6 +166,7 @@ newTimeCb = newCb timeWrap
 
 data MidiConfig
 
+-- TODO Use libremidi_midi_configuration_init
 instance MallocPtr MidiConfig where
   mallocPtr _ = mallocForeignPtrBytes0 #{size libremidi_midi_configuration}
 
@@ -200,6 +211,24 @@ mcIgnoreSensing = newField #{offset libremidi_midi_configuration, ignore_sensing
 
 mcTimestamps :: Field MidiConfig TimestampMode
 mcTimestamps = newField #{offset libremidi_midi_configuration, timestamps}
+
+foreign import ccall "libremidi/libremidi-c.h"
+  libremidi_get_version :: IO CString
+
+foreign import ccall "libremidi/libremidi-c.h"
+  libremidi_midi1_available_apis :: Ptr Void -> FunPtr AvailFun -> IO ()
+
+foreign import ccall "libremidi/libremidi-c.h"
+  libremidi_midi2_available_apis :: Ptr Void -> FunPtr AvailFun -> IO ()
+
+foreign import ccall "libremidi/libremidi-c.h"
+  libremidi_api_identifier :: Api -> IO CString
+
+foreign import ccall "libremidi/libremidi-c.h"
+  libremidi_api_display_name :: Api -> IO CString
+
+foreign import ccall "libremidi/libremidi-c.h"
+  libremidi_get_compiled_api_by_identifier :: CString -> IO Api
 
 foreign import ccall "libremidi/libremidi-c.h"
   libremidi_midi_in_port_clone :: Ptr InPort -> Ptr (Ptr InPort) -> IO Err
