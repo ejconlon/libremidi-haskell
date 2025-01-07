@@ -221,10 +221,10 @@ foreign import ccall "libremidi/libremidi-c.h"
   libremidi_get_version :: IO CString
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_available_midi1_apis :: Ptr Void -> FunPtr AvailFun -> IO ()
+  libremidi_midi1_available_apis :: Ptr Void -> FunPtr AvailFun -> IO ()
 
 foreign import ccall "libremidi/libremidi-c.h"
-  libremidi_available_midi2_apis :: Ptr Void -> FunPtr AvailFun -> IO ()
+  libremidi_midi2_available_apis :: Ptr Void -> FunPtr AvailFun -> IO ()
 
 foreign import ccall "libremidi/libremidi-c.h"
   libremidi_api_identifier :: Api -> IO CString

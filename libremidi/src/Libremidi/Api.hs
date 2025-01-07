@@ -533,12 +533,12 @@ newAvailCb f = LMF.newAvailCb (\_ -> f . fromBitEnum)
 availApis1 :: AvailFun -> IO ()
 availApis1 f = do
   cb <- newAvailCb f
-  withCb cb (LMF.libremidi_available_midi1_apis nullPtr)
+  withCb cb (LMF.libremidi_midi1_available_apis nullPtr)
 
 availApis2 :: AvailFun -> IO ()
 availApis2 f = do
   cb <- newAvailCb f
-  withCb cb (LMF.libremidi_available_midi2_apis nullPtr)
+  withCb cb (LMF.libremidi_midi2_available_apis nullPtr)
 
 apiIdentifier :: Api -> IO Text
 apiIdentifier = LMF.libremidi_api_identifier . toBitEnum >=> text0M
